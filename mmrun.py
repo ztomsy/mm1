@@ -1,13 +1,13 @@
 import tkgcore
 
-bot = tkgcore.Bot("_binance.json", "mm.log")
+bot = tkgcore.Bot("_binance_test.json", "mm.log")
 
 bot.init_logging()
 bot.load_config_from_file(bot.config_filename)
 
 bot.init_exchange()
 bot.test_balance = 0
-bot.start_currency = list(["ETH"])
+bot.start_currency = list(["BTC"])
 bot.init_exchange()
 bot.load_markets()
 balance = bot.load_balance()
