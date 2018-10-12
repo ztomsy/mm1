@@ -22,7 +22,7 @@ start_amount = 0.0011
 dest_amount1 = start_amount / order1_price
 
 order1 = tkgcore.RecoveryOrder("ETH/BTC", "BTC", start_amount, "ETH", dest_amount1,
-                              cancel_threshold=bot.markets["ETH/BTC"]["limits"]["amount"]["min"],
+                              cancel_threshold=0.03,
                               max_best_amount_order_updates=300, max_order_updates=20)
 
 om = tkgcore.OwaManager(bot.exchange)
@@ -35,8 +35,8 @@ while len(om.get_open_orders()) > 0:
 dest_amount2 = order1.filled_start_amount * 1.001
 
 order2 = tkgcore.RecoveryOrder("ETH/BTC", "ETH", order1.filled_dest_amount, "BTC", dest_amount2,
-                              cancel_threshold=bot.markets["ETH/BTC"]["limits"]["amount"]["min"],
-                              max_best_amount_order_updates=300, max_order_updates=20)
+                              cancel_threshold=0.03,
+                              max_best_amount_order_updates=1000, max_order_updates=20)
 
 om.add_order(order2)
 
