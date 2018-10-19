@@ -5,6 +5,9 @@ from tkgcore import OrderWithAim
 from tkgcore import RecoveryOrder
 import uuid
 import sys
+import csv
+import os
+import time
 
 
 class FokOrder(OrderWithAim):
@@ -25,11 +28,41 @@ class FokOrder(OrderWithAim):
         return "hold"
 
 
+class ScalpBot(tkgcore.Bot):
+
+    def __init__(self, default_config: str, log_filename=None ):
+        super(ScalpBot, self).__init__(default_config, log_filename)
+
+        self.report_fields = list(["scalp-id", "status", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
+                                   "leg1-order-updates", "leg1-filled"])
+
+    def log_report(self, report):
+        for r in self.report_fields:
+            self.log(self.LOG_INFO, "{} = {}".format(r, report[r] if r in report else "None"))
+
+    def save_csv_report(self, report: dict, filename: str = "report.csv"):
+        write_header = False
+        file_deals = "_{}/{}".format(self.exchange_id, filename)
+
+        directory = os.path.dirname(file_deals)
+        if not os.path.isdir(directory):
+            os.mkdir(directory)
+
+        if not os.path.isfile(file_deals):
+            write_header = True
+
+        with open(file_deals, 'a', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=self.report_fields, extrasaction="ignore")
+            if write_header:
+                writer.writeheader()
+            writer.writerow(report)
+
+
 class SingleScalp(object):
     cancel_threshold = 0.01
     commission = 0.0007
-    order1_max_updates = 10
-    order2_max_updates_for_profit = 10
+    order1_max_updates = 20
+    order2_max_updates_for_profit = 50
     order2_max_updates_market = 5
 
     def __init__(self, symbol: str, start_currency: str, amount_start: float, start_price: float, dest_currency: str,
@@ -137,11 +170,31 @@ def log_scalp_order(_bot, _scalp,  _scalp_order: OrderWithAim):
                     _scalp_order.max_order_updates))
 
 
-def report_close_scalp(_bot, _scalp:SingleScalp):
-    _bot.log(_bot.LOG_INFO, "######################################################################################")
-    _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
-    _bot.log(_bot.LOG_INFO, "Result: {}".format(_scalp.result_fact_diff))
-    _bot.log(_bot.LOG_INFO, "######################################################################################")
+def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
+
+    report = dict()
+
+    report["scalp-id"] = _scalp.id
+    report["result-fact-diff"] = float(_scalp.result_fact_diff)
+    report["start-qty"] = float(_scalp.start_amount)
+    report["cur1"] = str(_scalp.start_currency)
+    report["cur2"] = str(_scalp.dest_currency)
+    report["symbol"] = str(_scalp.symbol)
+    report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count) if _scalp.order1 is not None \
+        else None
+
+    report["leg1-filled"] = float(_scalp.order1.orders_history[0].filled / _scalp.order1.orders_history[0].amount) if \
+        _scalp.order1 is not None and _scalp.order1.orders_history[0].amount != 0.0 else None
+
+    _bot.log_report(report)
+    _bot.save_csv_report(report, "{}.csv".format(_scalp.id))
+    _bot.send_remote_report(report)
+
+        # todo : report for order 2
+    # report["leg2-order-updates"] = _scalp.order2.orders_history[0].update_requests_count if _scalp.order1 is not None
+    #     else None
+
+    return report
 
 
 def report_order1_closed(_bot, _scalp):
@@ -158,7 +211,6 @@ def report_order2_closed(_bot, _scalp):
                  "Scalp ID: {}. Closed after Order 1.".format(_scalp.id))
 
 
-
 symbol = "ETH/BTC"
 start_currency = "BTC"
 dest_currency = "ETH"
@@ -169,12 +221,12 @@ commission = 0.0007
 
 profit_with_fee = profit / ((1 - commission) ** 2)  # target profit considering commission
 
-bot = tkgcore.Bot("_binance_test.json", "scalp.log")
+bot = ScalpBot("_binance_test.json", "scalp.log")
 
 bot.offline = False
 
 total_result = 0.0
-scalps_to_do = 1  # number of consecutive scalp runs
+scalps_to_do = 20  # number of consecutive scalp runs
 run = 1  # current run
 
 
@@ -187,6 +239,8 @@ if bot.offline:
     bot.exchange.set_offline_mode("test_data/markets.json", "test_data/tickers.csv")
 else:
     bot.exchange.init_async_exchange()
+
+bot.init_remote_reports()
 
 bot.test_balance = 1
 bot.start_currency = list(["BTC"])
