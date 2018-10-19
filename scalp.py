@@ -59,9 +59,9 @@ class ScalpBot(tkgcore.Bot):
 
 
 class SingleScalp(object):
-    cancel_threshold = 0.01
+    cancel_threshold = 0
     commission = 0.0007
-    order1_max_updates = 20
+    order1_max_updates = 5
     order2_max_updates_for_profit = 50
     order2_max_updates_market = 5
 
@@ -237,8 +237,6 @@ bot.init_exchange()
 if bot.offline:
     bot.log(bot.LOG_INFO, "Loading from offline test_data/markets.json test_data/tickers.csv")
     bot.exchange.set_offline_mode("test_data/markets.json", "test_data/tickers.csv")
-else:
-    bot.exchange.init_async_exchange()
 
 bot.init_remote_reports()
 
@@ -287,6 +285,7 @@ while True:
         report_order2_closed(bot, scalp)
         report_close_scalp(bot, scalp)
         total_result += scalp.result_fact_diff
+        time.sleep(5)
 
         run += 1
         if run > scalps_to_do:
