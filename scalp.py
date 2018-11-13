@@ -351,12 +351,9 @@ while len(scalps.active_scalps) > 0:
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 
-            time.sleep(0.5)
-
             run += 1
             # if run > scalps_to_do:
             #     break
-
             # create new scalp if  have not executed total amount of scalps
             if len(scalps.active_scalps) < scalps.max_scalps:
                 bot.log(bot.LOG_INFO, "Fetching tickers...")
@@ -367,6 +364,10 @@ while len(scalps.active_scalps) > 0:
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
+            time.sleep(0.01)
+
+
+
 
 bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 bot.log(bot.LOG_INFO, "Exiting...")
