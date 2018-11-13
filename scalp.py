@@ -8,7 +8,8 @@ import sys
 import csv
 import os
 import time
-
+from typing import Dict, Tuple, List
+import copy
 
 class FokOrder(OrderWithAim):
     """
@@ -27,6 +28,12 @@ class FokOrder(OrderWithAim):
             return "cancel"
         return "hold"
 
+    def new_scalp_from_ticker(self):
+        ticker = bot.exchange.get_tickers(symbol)[symbol]
+        new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+        return new_scalp
+        scalps.add_scalp(new_scalp)
+
 
 class ScalpBot(tkgcore.Bot):
 
@@ -35,6 +42,7 @@ class ScalpBot(tkgcore.Bot):
 
         self.report_fields = list(["scalp-id", "status", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
                                    "leg1-order-updates", "leg1-filled"])
+
 
     def log_report(self, report):
         for r in self.report_fields:
@@ -133,6 +141,26 @@ class SingleScalp(object):
             return self.state
 
 
+class ScalpsCollection(object):
+    def __init__(self):
+        self.max_scalps = 10
+        self.active_scalps = dict()  # type: Dict[str, SingleScalp]
+
+    def _report_scalp_add(self, scalp_id):
+        print("Scalp ID: {} was added".format(scalp_id))
+
+    def _report_scalp_removed(self, scalp_id):
+        print("Scalp ID: {} was removed".format(scalp_id))
+
+    def add_scalp(self, single_scalp: SingleScalp = None):
+        self.active_scalps[single_scalp.id] = single_scalp
+        self._report_scalp_add(single_scalp.id)
+
+    def remove_scalp(self, scalp_id: str):
+        self.active_scalps.pop(scalp_id)
+        self._report_scalp_removed(scalp_id)
+
+
 def log_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
@@ -223,10 +251,10 @@ profit_with_fee = profit / ((1 - commission) ** 2)  # target profit considering 
 
 bot = ScalpBot("_binance_test.json", "scalp.log")
 
-bot.offline = False
+bot.offline = True
 
 total_result = 0.0
-scalps_to_do = 20  # number of consecutive scalp runs
+scalps_to_do = 1  # number of consecutive scalp runs
 run = 1  # current run
 
 
@@ -236,7 +264,7 @@ bot.load_config_from_file(bot.config_filename)
 bot.init_exchange()
 if bot.offline:
     bot.log(bot.LOG_INFO, "Loading from offline test_data/markets.json test_data/tickers.csv")
-    bot.exchange.set_offline_mode("test_data/markets.json", "test_data/tickers.csv")
+    bot.exchange.set_offline_mode("test_data/markets.json", "test_data/tickers_many.csv")
 
 bot.init_remote_reports()
 
@@ -246,63 +274,101 @@ bot.start_currency = list(["BTC"])
 balance = bot.load_balance()
 bot.load_markets()
 
-if bot.offline:
-    bot.fetch_tickers()
-    ticker = bot.tickers[symbol]
-else:
-    ticker = bot.exchange._ccxt.fetch_tickers(symbol)[symbol]
+ticker = bot.exchange.get_tickers(symbol)[symbol]
+
+# if bot.offline:
+#     bot.fetch_tickers()
+#     ticker = bot.tickers[symbol]
+# else:
+#     ticker = bot.exchange._ccxt.fetch_tickers(symbol)[symbol]
 
 om = tkgcore.OwaManager(bot.exchange)
 
 scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+scalps = ScalpsCollection()
+scalps.add_scalp(scalp)
 
-while True:
 
-    order1_status = scalp.order1.status if scalp.order1 is not None else ""
-    order2_status = scalp.order2.status if scalp.order2 is not None else ""
+while len(scalps.active_scalps) > 0:
+    bot.log(bot.LOG_INFO, "")
+    bot.log(bot.LOG_INFO, "")
+    bot.log(bot.LOG_INFO, "")
+    bot.log(bot.LOG_INFO, "######################################################################################")
+    bot.log(bot.LOG_INFO, "Total active scalps: {} ".format(len(scalps.active_scalps)))
+    bot.log(bot.LOG_INFO, "Total result so far {}".format(total_result))
 
-    scalp.update_state(order1_status, order2_status)
+    scalps_in_oder1 = len(list(filter(lambda x: x.state == "order1", scalps.active_scalps.values())))
+    scalps_in_oder2 = len(list(filter(lambda x: x.state == "order2", scalps.active_scalps.values())))
 
-    if scalp.state == "new":
+    bot.log(bot.LOG_INFO, "Total active orders: {}".format(len(om.get_open_orders())))
+    bot.log(bot.LOG_INFO, "Scalps in order1:{} . Scalps in order2:{}".format(scalps_in_oder1, scalps_in_oder2))
+    bot.log(bot.LOG_INFO, "######################################################################################")
 
-        bot.log(bot.LOG_INFO, "Scalp ID: {}. Creating order 1".format(scalp.id))
-        scalp.create_order1()
-        om.add_order(scalp.order1)
+    bot.log(bot.LOG_INFO, "")
+    bot.log(bot.LOG_INFO, "")
+    bot.log(bot.LOG_INFO, "")
 
-    if scalp.state == "order1":
-        log_scalp_order(bot, scalp, scalp.order1)
+    active_scalps = list(scalps.active_scalps.values())
 
-    if scalp.state == "order1_complete":
-        report_order1_closed(bot, scalp)
-        bot.log(bot.LOG_INFO, "Scalp {}. Creating Order 2... ".format(scalp.id))
-        scalp.create_order2()
-        om.add_order(scalp.order2)
+    for scalp in active_scalps:
+        bot.log(bot.LOG_INFO, "Proceed Scalp id: {}".format(scalp.id))
 
-    if scalp.state == "order2":
-        log_scalp_order(bot, scalp, scalp.order2)
+        order1_status = scalp.order1.status if scalp.order1 is not None else ""
+        order2_status = scalp.order2.status if scalp.order2 is not None else ""
 
-    if scalp.state == "closed":
-        report_order2_closed(bot, scalp)
-        report_close_scalp(bot, scalp)
-        total_result += scalp.result_fact_diff
-        time.sleep(5)
+        scalp.update_state(order1_status, order2_status)
 
-        run += 1
-        if run > scalps_to_do:
+        if scalp.state == "new":
+
+            bot.log(bot.LOG_INFO, "Scalp ID: {}. Creating order 1".format(scalp.id))
+            scalp.create_order1()
+            om.add_order(scalp.order1)
+
+        if scalp.state == "order1":
+            log_scalp_order(bot, scalp, scalp.order1)
+
+        if scalp.state == "order1_complete":
+            report_order1_closed(bot, scalp)
+            bot.log(bot.LOG_INFO, "Scalp {}. Creating Order 2... ".format(scalp.id))
+            scalp.create_order2()
+            om.add_order(scalp.order2)
+
+            # create new scalp if  have not executed total amount of scalps
+            if len(scalps.active_scalps) < scalps.max_scalps:
+                bot.log(bot.LOG_INFO, "Fetching tickers...")
+                ticker = bot.exchange.get_tickers(symbol)[symbol]
+                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+                scalps.add_scalp(new_scalp)
+
+        if scalp.state == "order2":
+            log_scalp_order(bot, scalp, scalp.order2)
+
+        if scalp.state == "closed":
+            report_order2_closed(bot, scalp)
+            report_close_scalp(bot, scalp)
+            total_result += scalp.result_fact_diff
+
+            scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
-            break
 
-        # create new scalp if  have not executed total amount of scalps
-        if bot.offline:
-            bot.fetch_tickers()
-            ticker = bot.tickers[symbol]
-        else:
-            ticker = bot.exchange._ccxt.fetch_tickers(symbol)[symbol]
+            time.sleep(0.5)
 
-        scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+            run += 1
+            # if run > scalps_to_do:
+            #     break
 
-    if len(om.get_open_orders()) > 0:
-        om.proceed_orders()
+            # create new scalp if  have not executed total amount of scalps
+            if len(scalps.active_scalps) < scalps.max_scalps:
+                bot.log(bot.LOG_INFO, "Fetching tickers...")
 
+                ticker = bot.exchange.get_tickers(symbol)[symbol]
+                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+                scalps.add_scalp(new_scalp)
+
+        if len(om.get_open_orders()) > 0:
+            om.proceed_orders()
+
+bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 bot.log(bot.LOG_INFO, "Exiting...")
+
 sys.exit(0)
