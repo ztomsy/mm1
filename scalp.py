@@ -52,7 +52,7 @@ class ScalpBot(tkgcore.Bot):
         self.commission = 0.0007
 
         self.total_result = 0.0
-        self.max_active_scalps = 2 # maximum number of live active scalps
+        self.max_active_scalps = 10 # maximum number of live active scalps
         self.scalps_to_do = 1  # number of consecutive scalp runs
 
         self.max_runs = 1
@@ -166,6 +166,7 @@ class ScalpsCollection(object):
     def __init__(self, max_scalps:int=1):
         self.max_scalps = max_scalps
         self.active_scalps = dict()  # type: Dict[str, SingleScalp]
+        self.scalps_added = 0  # type: int
 
     def _report_scalp_add(self, scalp_id):
         print("Scalp ID: {} was added".format(scalp_id))
@@ -175,6 +176,7 @@ class ScalpsCollection(object):
 
     def add_scalp(self, single_scalp: SingleScalp = None):
         self.active_scalps[single_scalp.id] = single_scalp
+        self.scalps_added += 1
         self._report_scalp_add(single_scalp.id)
 
     def remove_scalp(self, scalp_id: str):
@@ -293,6 +295,7 @@ total_result = 0.0
 ticker = bot.exchange.get_tickers(symbol)[symbol]
 
 om = tkgcore.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
+om.log = lambda x, y: x
 
 scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
 scalps = ScalpsCollection(bot.max_active_scalps)
@@ -304,6 +307,7 @@ while len(scalps.active_scalps) > 0:
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "######################################################################################")
+    bot.log(bot.LOG_INFO, "Run: {}/{}".format(bot.run, bot.max_runs))
     bot.log(bot.LOG_INFO, "Total active scalps: {} ".format(len(scalps.active_scalps)))
     bot.log(bot.LOG_INFO, "Total result so far {}".format(total_result))
 
@@ -348,12 +352,16 @@ while len(scalps.active_scalps) > 0:
             om.add_order(scalp.order2)
 
             # create new scalp if  have not executed total amount of scalps
-            if len(scalps.active_scalps) < scalps.max_scalps and  bot.run < bot.max_runs:
+            if len(scalps.active_scalps) <= scalps.max_scalps  and  bot.run < bot.max_runs:
                 bot.log(bot.LOG_INFO, "Adding new scalp after order1 is complete  ")
                 bot.log(bot.LOG_INFO, "Fetching tickers...")
                 ticker = bot.exchange.get_tickers(symbol)[symbol]
                 new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
                 scalps.add_scalp(new_scalp)
+            else:
+                if scalps.scalps_added > scalps.max_scalps:
+                    bot.run += 1
+                    scalps.scalps_added = 0
 
         if scalp.state == "order2":
             log_scalp_order(bot, scalp, scalp.order2)
@@ -366,7 +374,7 @@ while len(scalps.active_scalps) > 0:
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 
-            if len(scalps.active_scalps) +1  < scalps.max_scalps and  bot.run < bot.max_runs:
+            if len(scalps.active_scalps) <= scalps.max_scalps and  bot.run < bot.max_runs:
                 bot.log(bot.LOG_INFO, "Adding new scalp after order2 is complete  ")
 
                 bot.log(bot.LOG_INFO, "Fetching tickers...")
@@ -375,7 +383,9 @@ while len(scalps.active_scalps) > 0:
                 new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
                 scalps.add_scalp(new_scalp)
             else:
-                bot.run += 1
+                if scalps.scalps_added > scalps.max_scalps:
+                    bot.run += 1
+                    scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
