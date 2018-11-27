@@ -186,7 +186,7 @@ class ScalpsCollection(object):
 
     def add_scalp(self, single_scalp: SingleScalp = None):
         self.active_scalps[single_scalp.id] = single_scalp
-        self.scalps_added += 1
+
         self._report_scalp_add(single_scalp.id)
 
     def remove_scalp(self, scalp_id: str):
@@ -380,15 +380,11 @@ while len(scalps.active_scalps) > 0:
                                         )
 
                 scalps.add_scalp(new_scalp)
+                scalps.scalps_added += 1
 
-            if scalps.scalps_added > scalps.max_scalps:
+            if scalps.scalps_added >= scalps.max_scalps-1:
                 bot.run += 1
-                scalps.scalps_added = 0
-            else:
-
-                if scalps.scalps_added > scalps.max_scalps:
-                    bot.run += 1
-                    scalps.scalps_added = 0
+                # scalps.scalps_added = 0
 
         if scalp.state == "order2":
             pass
@@ -418,11 +414,12 @@ while len(scalps.active_scalps) > 0:
                                         )
 
                 scalps.add_scalp(new_scalp)
-            else:
 
-                if scalps.scalps_added > scalps.max_scalps:
-                    bot.run += 1
-                    scalps.scalps_added = 0
+            # else:
+
+            if scalps.scalps_added >= scalps.max_scalps - 1:
+                bot.run += 1
+                # scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
