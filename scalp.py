@@ -43,9 +43,9 @@ class ScalpBot(tkgcore.Bot):
                                    "leg1-order-updates", "leg1-filled"])
 
         self.om_proceed_sleep = 0.0
-        self.symbol = "ETH/BTC"
-        self.start_currency = "BTC"
-        self.dest_cuurency = "ETH"
+        self.symbol = ""
+        self.start_currency = ""
+        self.dest_currency = ""
 
         self.start_amount = 0.0
         self.profit = 0.0
@@ -293,7 +293,7 @@ bot.load_markets()
 # init parameters
 symbol = bot.symbol
 start_currency = bot.start_currency
-dest_currency = bot.dest_cuurency
+dest_currency = bot.dest_currency
 
 start_amount = bot.start_amount
 profit = bot.profit

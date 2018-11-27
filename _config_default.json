@@ -3,6 +3,8 @@
   "script_id": "mm_test",
   "exchange_id": "binance",
   "symbol": "ETH/BTC",
+  "start_currency": "BTC",
+  "dest_currency": "ETH",
   "start_amount": 0.01,
   "profit": 0.001,
   "commission" : 0.00075,
