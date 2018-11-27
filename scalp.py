@@ -1,4 +1,3 @@
-
 import tkgcore
 from tkgcore import TradeOrder
 from tkgcore import OrderWithAim
@@ -10,6 +9,7 @@ import os
 import time
 from typing import Dict, Tuple, List
 import copy
+
 
 class FokOrder(OrderWithAim):
     """
@@ -36,7 +36,7 @@ class FokOrder(OrderWithAim):
 
 class ScalpBot(tkgcore.Bot):
 
-    def __init__(self, default_config: str, log_filename=None ):
+    def __init__(self, default_config: str, log_filename=None):
         super(ScalpBot, self).__init__(default_config, log_filename)
 
         self.report_fields = list(["scalp-id", "status", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
@@ -52,13 +52,17 @@ class ScalpBot(tkgcore.Bot):
         self.commission = 0.0007
 
         self.total_result = 0.0
-        self.max_active_scalps = 10 # maximum number of live active scalps
+        self.max_active_scalps = 10  # maximum number of live active scalps
         self.scalps_to_do = 1  # number of consecutive scalp runs
 
         self.max_runs = 1
         self.run = 0  # current run
 
         self.om_proceed_sleep = 0.01  # sleep after orders proceed
+        self.order1_max_updates = 0
+        self.order2_max_updates_for_profit = 0
+        self.order2_max_updates_market = 0
+        self.cancel_threshold = 0.0
 
         self.offline_tickers_file = "test_data/tickers_many.csv"
 
@@ -88,14 +92,14 @@ class ScalpBot(tkgcore.Bot):
 
 
 class SingleScalp(object):
-    cancel_threshold = 0
-    commission = 0.0007
-    order1_max_updates = 5
-    order2_max_updates_for_profit = 50
-    order2_max_updates_market = 5
 
     def __init__(self, symbol: str, start_currency: str, amount_start: float, start_price: float, dest_currency: str,
-                 profit: float, order1: OrderWithAim = None, order2: RecoveryOrder = None):
+                 profit: float,
+                 commission: float = 0.001,
+                 order1_max_updates: int = 5,
+                 order2_max_updates_for_profit: int = 50,
+                 order2_max_updates_market: int = 5,
+                 cancel_threshold: float = 0.0):
 
         self.symbol = symbol
 
@@ -104,11 +108,17 @@ class SingleScalp(object):
         self.start_price = start_price
 
         self.dest_currency = dest_currency
-
         self.profit = profit
 
-        self.order1 = order1
-        self.order2 = order2
+        self.commission = commission
+        self.order1_max_updates = order1_max_updates
+        self.order2_max_updates_for_profit = order2_max_updates_for_profit
+        self.order2_max_updates_market = order2_max_updates_market
+
+        self.cancel_threshold = cancel_threshold
+
+        self.order1 = None  # type: FokOrder
+        self.order2 = None  # type: RecoveryOrder
 
         self.result_fact_diff = 0.0
 
@@ -125,7 +135,7 @@ class SingleScalp(object):
         return order1
 
     def create_order2(self):
-        order2_target_amount = self.order1.filled_start_amount * (1+self.profit)
+        order2_target_amount = self.order1.filled_start_amount * (1 + self.profit)
 
         order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
                                order2_target_amount, self.commission, self.cancel_threshold,
@@ -163,7 +173,7 @@ class SingleScalp(object):
 
 
 class ScalpsCollection(object):
-    def __init__(self, max_scalps:int=1):
+    def __init__(self, max_scalps: int = 1):
         self.max_scalps = max_scalps
         self.active_scalps = dict()  # type: Dict[str, SingleScalp]
         self.scalps_added = 0  # type: int
@@ -184,29 +194,32 @@ class ScalpsCollection(object):
         self._report_scalp_removed(scalp_id)
 
 
-def log_status(_bot, _scalp):
+def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
     _bot.log(_bot.LOG_INFO,
-            "State: {}. Order 1 status {} filled {}/{} (upd {}/{}). Order 2 status {} state {} filled {}/{} (upd "
-            "{}/{}) ".
+             "State: {}. Order 1 status {} filled {}/{} (upd {}/{}). Order 2 status {} state {} filled {}/{} (upd "
+             "{}/{}) ".
              format(_scalp.state,
-                    _scalp.order1.filled,
-                    _scalp.order1.status,
-                    _scalp.order1.amount,
-                    _scalp.order1.get_active_order().update_requests_count,
-                    _scalp.order1.max_order_updates,
-                    _scalp.order2.status,
-                    _scalp.order2.state,
-                    _scalp.order2.filled,
-                    _scalp.order2.amount,
-                    _scalp.order1.get_active_order().update_requests_count,
-                    _scalp.order1.max_order_updates))
+                    _scalp.order1.status if _scalp.order1 is not None else None,
+                    _scalp.order1.filled if _scalp.order1 is not None else None,
+                    _scalp.order1.amount if _scalp.order1 is not None else None,
+                    _scalp.order1.get_active_order().update_requests_count
+                    if _scalp.order1 is not None and _scalp.order1.get_active_order() is not None else None,
+
+                    _scalp.order1.max_order_updates if _scalp.order1 is not None else None,
+                    _scalp.order2.status if _scalp.order2 is not None else None,
+                    _scalp.order2.state if _scalp.order2 is not None else None,
+                    _scalp.order2.filled if _scalp.order2 is not None else None,
+                    _scalp.order2.amount if _scalp.order2 is not None else None,
+                    _scalp.order2.get_active_order().update_requests_count
+                    if _scalp.order2 is not None and _scalp.order2.get_active_order() is not None else None,
+                    _scalp.order2.max_order_updates if _scalp.order2 is not None else None))
 
     _bot.log(_bot.LOG_INFO, "######################################################################################")
 
 
-def log_scalp_order(_bot, _scalp,  _scalp_order: OrderWithAim):
+def log_scalp_order(_bot, _scalp, _scalp_order: OrderWithAim):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
     _bot.log(_bot.LOG_INFO,
@@ -222,7 +235,6 @@ def log_scalp_order(_bot, _scalp,  _scalp_order: OrderWithAim):
 
 
 def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
-
     report = dict()
 
     report["scalp-id"] = _scalp.id
@@ -231,7 +243,8 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur1"] = str(_scalp.start_currency)
     report["cur2"] = str(_scalp.dest_currency)
     report["symbol"] = str(_scalp.symbol)
-    report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count) if _scalp.order1 is not None \
+    report["leg1-order-updates"] = int(
+        _scalp.order1.orders_history[0].update_requests_count) if _scalp.order1 is not None \
         else None
 
     report["leg1-filled"] = float(_scalp.order1.orders_history[0].filled / _scalp.order1.orders_history[0].amount) if \
@@ -241,7 +254,7 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     _bot.save_csv_report(report, "{}.csv".format(_scalp.id))
     _bot.send_remote_report(report)
 
-        # todo : report for order 2
+    # todo : report for order 2
     # report["leg2-order-updates"] = _scalp.order2.orders_history[0].update_requests_count if _scalp.order1 is not None
     #     else None
 
@@ -255,12 +268,12 @@ def report_order1_closed(_bot, _scalp):
 
 def report_order2_closed(_bot, _scalp):
     if _scalp.order2 is not None:
-        _bot.log(_bot.LOG_INFO, "Scalp ID: {}. Order 2 closed. Filled {} {}".format(_scalp.id, _scalp.order2.dest_currency,
-                                                                                _scalp.order2.filled_dest_amount))
+        _bot.log(_bot.LOG_INFO,
+                 "Scalp ID: {}. Order 2 closed. Filled {} {}".format(_scalp.id, _scalp.order2.dest_currency,
+                                                                     _scalp.order2.filled_dest_amount))
     else:
         _bot.log(_bot.LOG_INFO,
                  "Scalp ID: {}. Closed after Order 1.".format(_scalp.id))
-
 
 
 bot = ScalpBot("", "scalp.log")
@@ -301,7 +314,6 @@ scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_cu
 scalps = ScalpsCollection(bot.max_active_scalps)
 scalps.add_scalp(scalp)
 
-
 while len(scalps.active_scalps) > 0:
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "")
@@ -336,14 +348,16 @@ while len(scalps.active_scalps) > 0:
 
         scalp.update_state(order1_status, order2_status)
 
-        if scalp.state == "new":
+        log_scalp_status(bot, scalp)
 
+        if scalp.state == "new":
             bot.log(bot.LOG_INFO, "Scalp ID: {}. Creating order 1".format(scalp.id))
             scalp.create_order1()
             om.add_order(scalp.order1)
 
         if scalp.state == "order1":
-            log_scalp_order(bot, scalp, scalp.order1)
+            pass
+            # log_scalp_order(bot, scalp, scalp.order1)
 
         if scalp.state == "order1_complete":
             report_order1_closed(bot, scalp)
@@ -352,19 +366,28 @@ while len(scalps.active_scalps) > 0:
             om.add_order(scalp.order2)
 
             # create new scalp if  have not executed total amount of scalps
-            if len(scalps.active_scalps) <= scalps.max_scalps  and  bot.run < bot.max_runs:
+            if len(scalps.active_scalps) <= scalps.max_scalps and bot.run < bot.max_runs:
                 bot.log(bot.LOG_INFO, "Adding new scalp after order1 is complete  ")
                 bot.log(bot.LOG_INFO, "Fetching tickers...")
                 ticker = bot.exchange.get_tickers(symbol)[symbol]
-                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency,
+                                        profit_with_fee,
+                                        bot.commission,
+                                        bot.order1_max_updates,
+                                        bot.order2_max_updates_for_profit,
+                                        bot.order2_max_updates_market,
+                                        bot.cancel_threshold
+                                        )
+
                 scalps.add_scalp(new_scalp)
-            else:
-                if scalps.scalps_added > scalps.max_scalps:
-                    bot.run += 1
-                    scalps.scalps_added = 0
+
+            if scalps.scalps_added > scalps.max_scalps:
+                bot.run += 1
+                scalps.scalps_added = 0
 
         if scalp.state == "order2":
-            log_scalp_order(bot, scalp, scalp.order2)
+            pass
+            # log_scalp_order(bot, scalp, scalp.order2)
 
         if scalp.state == "closed":
             report_order2_closed(bot, scalp)
@@ -374,23 +397,34 @@ while len(scalps.active_scalps) > 0:
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 
-            if len(scalps.active_scalps) <= scalps.max_scalps and  bot.run < bot.max_runs:
+            if len(scalps.active_scalps) <= scalps.max_scalps and bot.run < bot.max_runs:
                 bot.log(bot.LOG_INFO, "Adding new scalp after order2 is complete  ")
 
                 bot.log(bot.LOG_INFO, "Fetching tickers...")
 
                 ticker = bot.exchange.get_tickers(symbol)[symbol]
-                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+                new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency,
+                                        profit_with_fee,
+                                        bot.commission,
+                                        bot.order1_max_updates,
+                                        bot.order2_max_updates_for_profit,
+                                        bot.order2_max_updates_market,
+                                        bot.cancel_threshold
+                                        )
+
                 scalps.add_scalp(new_scalp)
-            else:
-                if scalps.scalps_added > scalps.max_scalps:
-                    bot.run += 1
-                    scalps.scalps_added = 0
+
+            if scalps.scalps_added > scalps.max_scalps:
+                bot.run += 1
+                scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
             time.sleep(bot.om_proceed_sleep)
 
+bot.log(bot.LOG_INFO, "")
+bot.log(bot.LOG_INFO, "")
+bot.log(bot.LOG_INFO, "No more active scalps")
 bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 bot.log(bot.LOG_INFO, "Exiting...")
 
