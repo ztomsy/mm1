@@ -287,7 +287,7 @@ if bot.offline:
     bot.init_offline_mode()
 
 bot.init_remote_reports()
-balance = bot.load_balance()
+
 bot.load_markets()
 
 # init parameters
