@@ -384,6 +384,11 @@ while len(scalps.active_scalps) > 0:
             if scalps.scalps_added > scalps.max_scalps:
                 bot.run += 1
                 scalps.scalps_added = 0
+            else:
+
+                if scalps.scalps_added > scalps.max_scalps:
+                    bot.run += 1
+                    scalps.scalps_added = 0
 
         if scalp.state == "order2":
             pass
@@ -413,10 +418,11 @@ while len(scalps.active_scalps) > 0:
                                         )
 
                 scalps.add_scalp(new_scalp)
+            else:
 
-            if scalps.scalps_added > scalps.max_scalps:
-                bot.run += 1
-                scalps.scalps_added = 0
+                if scalps.scalps_added > scalps.max_scalps:
+                    bot.run += 1
+                    scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
