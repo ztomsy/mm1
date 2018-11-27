@@ -9,7 +9,6 @@
   "max_active_scalps": 5,
   "max_runs": 1,
 
-  "test_balance":1,
   "api_key": {"apiKey": "",
          "secret": ""},
 
