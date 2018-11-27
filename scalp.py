@@ -47,18 +47,18 @@ class ScalpBot(tkgcore.Bot):
         self.start_currency = "BTC"
         self.dest_cuurency = "ETH"
 
-        self.start_amount = 0.01
-        self.profit = 0.001
-        self.commission = 0.0007
+        self.start_amount = 0.0
+        self.profit = 0.0
+        self.commission = 0.0
 
         self.total_result = 0.0
-        self.max_active_scalps = 10  # maximum number of live active scalps
+        self.max_active_scalps = 0  # maximum number of live active scalps
         self.scalps_to_do = 1  # number of consecutive scalp runs
 
-        self.max_runs = 1
+        self.max_runs = 0
         self.run = 0  # current run
 
-        self.om_proceed_sleep = 0.01  # sleep after orders proceed
+        self.om_proceed_sleep = 0.0  # sleep after orders proceed
         self.order1_max_updates = 0
         self.order2_max_updates_for_profit = 0
         self.order2_max_updates_market = 0
