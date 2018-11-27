@@ -314,6 +314,8 @@ scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_cu
 scalps = ScalpsCollection(bot.max_active_scalps)
 scalps.add_scalp(scalp)
 
+scalps_added = 1
+
 while len(scalps.active_scalps) > 0:
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "")
@@ -381,10 +383,11 @@ while len(scalps.active_scalps) > 0:
 
                 scalps.add_scalp(new_scalp)
                 scalps.scalps_added += 1
+                scalps_added += 1
 
             if scalps.scalps_added >= scalps.max_scalps-1:
                 bot.run += 1
-                # scalps.scalps_added = 0
+                scalps.scalps_added = 0
 
         if scalp.state == "order2":
             pass
@@ -419,7 +422,7 @@ while len(scalps.active_scalps) > 0:
 
             if scalps.scalps_added >= scalps.max_scalps - 1:
                 bot.run += 1
-                # scalps.scalps_added = 0
+                scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
@@ -427,6 +430,8 @@ while len(scalps.active_scalps) > 0:
 
 bot.log(bot.LOG_INFO, "")
 bot.log(bot.LOG_INFO, "")
+
+bot.log(bot.LOG_INFO, "Total scalps added with order 1 complete {}".format(scalps_added))
 bot.log(bot.LOG_INFO, "No more active scalps")
 bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 bot.log(bot.LOG_INFO, "Exiting...")
