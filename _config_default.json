@@ -8,8 +8,9 @@
   "start_amount": 0.01,
   "profit": 0.001,
   "commission" : 0.00075,
-  "max_active_scalps": 5,
-  "max_runs": 1,
+  "max_active_scalps": 10,
+  "max_buy_orders_per_run":  5,
+  "max_runs": 3,
 
   "api_key": {"apiKey": "",
          "secret": ""},

@@ -53,6 +53,8 @@ class ScalpBot(tkgcore.Bot):
 
         self.total_result = 0.0
         self.max_active_scalps = 0  # maximum number of live active scalps
+        self.max_buy_orders_per_run = 0
+
         self.scalps_to_do = 1  # number of consecutive scalp runs
 
         self.max_runs = 0
@@ -176,7 +178,7 @@ class ScalpsCollection(object):
     def __init__(self, max_scalps: int = 1):
         self.max_scalps = max_scalps
         self.active_scalps = dict()  # type: Dict[str, SingleScalp]
-        self.scalps_added = 0  # type: int
+        self.scalps_order1_complete = 0  # type: int
 
     def _report_scalp_add(self, scalp_id):
         print("Scalp ID: {} was added".format(scalp_id))
@@ -198,9 +200,10 @@ def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
     _bot.log(_bot.LOG_INFO,
-             "State: {}. Order 1 status {} filled {}/{} (upd {}/{}). Order 2 status {} state {} filled {}/{} (upd "
+             "State: {}. Order1: price:{} status:{} filled:{}/{} (upd:{}/{}). Order2: price:{} status:{} state:{} filled:{}/{} (upd "
              "{}/{}) ".
              format(_scalp.state,
+                    _scalp.order1.price if _scalp.order1 is not None else None,
                     _scalp.order1.status if _scalp.order1 is not None else None,
                     _scalp.order1.filled if _scalp.order1 is not None else None,
                     _scalp.order1.amount if _scalp.order1 is not None else None,
@@ -208,6 +211,7 @@ def log_scalp_status(_bot, _scalp):
                     if _scalp.order1 is not None and _scalp.order1.get_active_order() is not None else None,
 
                     _scalp.order1.max_order_updates if _scalp.order1 is not None else None,
+                    _scalp.order2.price if _scalp.order2 is not None else None,
                     _scalp.order2.status if _scalp.order2 is not None else None,
                     _scalp.order2.state if _scalp.order2 is not None else None,
                     _scalp.order2.filled if _scalp.order2 is not None else None,
@@ -315,6 +319,7 @@ scalps = ScalpsCollection(bot.max_active_scalps)
 scalps.add_scalp(scalp)
 
 scalps_added = 0
+prev_ticker = None
 
 while len(scalps.active_scalps) > 0:
     bot.log(bot.LOG_INFO, "")
@@ -323,6 +328,7 @@ while len(scalps.active_scalps) > 0:
     bot.log(bot.LOG_INFO, "######################################################################################")
     bot.log(bot.LOG_INFO, "Run: {}/{}".format(bot.run, bot.max_runs))
     bot.log(bot.LOG_INFO, "Total active scalps: {} ".format(len(scalps.active_scalps)))
+    bot.log(bot.LOG_INFO, "Scalps adeed: {}/{} ".format(scalps.scalps_order1_complete, bot.max_buy_orders_per_run))
     bot.log(bot.LOG_INFO, "Total result so far {}".format(total_result))
 
     scalps_in_oder1 = len(list(filter(lambda x: x.state == "order1", scalps.active_scalps.values())))
@@ -343,24 +349,46 @@ while len(scalps.active_scalps) > 0:
         break
 
     # create new scalp if  have not executed total amount of scalps
-    if len(scalps.active_scalps) < scalps.max_scalps and bot.run <= bot.max_runs:
-        bot.log(bot.LOG_INFO, "Adding new scalp after order1 is complete  ")
+    if scalps_in_oder1 < bot.max_buy_orders_per_run and len(scalps.active_scalps) < scalps.max_scalps and bot.run < bot.max_runs:
+        bot.log(bot.LOG_INFO, "Adding new scalp  ")
         bot.log(bot.LOG_INFO, "Fetching tickers...")
-        ticker = bot.exchange.get_tickers(symbol)[symbol]
-        new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency,
-                                profit_with_fee,
-                                bot.commission,
-                                bot.order1_max_updates,
-                                bot.order2_max_updates_for_profit,
-                                bot.order2_max_updates_market,
-                                bot.cancel_threshold
-                                )
 
-        scalps.add_scalp(new_scalp)
+        try:
+            new_buy_order_price = None
+            ticker = None
+            ticker = bot.exchange.get_tickers(symbol)[symbol]
+        except Exception as e:
+            bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
+                       format(bot.exchange_id, bot.session_uuid))
 
-    if scalps.scalps_added > scalps.max_scalps - 1:
+            bot.log(bot.LOG_ERROR, "Exception: {}".format(type(e).__name__))
+            bot.log(bot.LOG_ERROR, "Exception body:", e.args)
+
+        if ticker is not None:
+            if prev_ticker is not None and ticker["bid"] == prev_ticker["bid"]:
+
+                new_buy_order_price = ticker["bid"]*(1-bot.profit)
+                bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
+                    new_buy_order_price, prev_ticker["bid"]))
+            else:
+                new_buy_order_price = ticker["bid"]
+
+            prev_ticker = ticker
+
+            new_scalp = SingleScalp(symbol, start_currency, start_amount, new_buy_order_price, dest_currency,
+                                    profit_with_fee,
+                                    bot.commission,
+                                    bot.order1_max_updates,
+                                    bot.order2_max_updates_for_profit,
+                                    bot.order2_max_updates_market,
+                                    bot.cancel_threshold
+                                    )
+
+            scalps.add_scalp(new_scalp)
+
+    if scalps.scalps_order1_complete >= bot.max_buy_orders_per_run - 1 and bot.run < bot.max_runs:
         bot.run += 1
-        scalps.scalps_added = 0
+        scalps.scalps_order1_complete = 0
 
     for scalp in active_scalps:
         bot.log(bot.LOG_INFO, "Proceed Scalp id: {}".format(scalp.id))
@@ -371,7 +399,6 @@ while len(scalps.active_scalps) > 0:
         scalp.update_state(order1_status, order2_status)
 
         log_scalp_status(bot, scalp)
-
 
         if scalp.state == "new":
             bot.log(bot.LOG_INFO, "Scalp ID: {}. Creating order 1".format(scalp.id))
@@ -388,7 +415,7 @@ while len(scalps.active_scalps) > 0:
             scalp.create_order2()
             om.add_order(scalp.order2)
 
-            scalps.scalps_added += 1
+            scalps.scalps_order1_complete += 1
             scalps_added += 1
 
             # if scalps.scalps_added >= scalps.max_scalps-1:
