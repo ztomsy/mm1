@@ -247,12 +247,12 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur1"] = str(_scalp.start_currency)
     report["cur2"] = str(_scalp.dest_currency)
     report["symbol"] = str(_scalp.symbol)
-    report["leg1-order-updates"] = int(
-        _scalp.order1.orders_history[0].update_requests_count) if _scalp.order1 is not None \
-        else None
 
-    report["leg1-filled"] = float(_scalp.order1.orders_history[0].filled / _scalp.order1.orders_history[0].amount) if \
-        _scalp.order1 is not None and _scalp.order1.orders_history[0].amount != 0.0 else None
+    if _scalp.order1 is not None and len(_scalp.order1.orders_history) > 0:
+        report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count)
+
+        report["leg1-filled"] = float(_scalp.order1.orders_history[0].filled / _scalp.order1.orders_history[0].amount) if\
+            _scalp.order1.orders_history[0].amount != 0.0 else None
 
     _bot.log_report(report)
     _bot.save_csv_report(report, "{}.csv".format(_scalp.id))
@@ -312,7 +312,12 @@ total_result = 0.0
 ticker = bot.exchange.get_tickers(symbol)[symbol]
 
 om = tkgcore.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
-om.log = lambda x, y: x
+# om.log = lambda x, y: x
+om.log = bot.log  # override order manager logger to the bot logger
+om.LOG_INFO = bot.LOG_INFO
+om.LOG_ERROR = bot.LOG_ERROR
+om.LOG_DEBUG = bot.LOG_DEBUG
+om.LOG_CRITICAL = bot.LOG_CRITICAL
 
 scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
 scalps = ScalpsCollection(bot.max_active_scalps)
@@ -349,7 +354,8 @@ while len(scalps.active_scalps) > 0:
         break
 
     # create new scalp if  have not executed total amount of scalps
-    if scalps_in_oder1 < bot.max_buy_orders_per_run and len(scalps.active_scalps) < scalps.max_scalps and bot.run < bot.max_runs:
+    if scalps_in_oder1 < bot.max_buy_orders_per_run and len(
+            scalps.active_scalps) < scalps.max_scalps and bot.run < bot.max_runs:
         bot.log(bot.LOG_INFO, "Adding new scalp  ")
         bot.log(bot.LOG_INFO, "Fetching tickers...")
 
@@ -359,7 +365,7 @@ while len(scalps.active_scalps) > 0:
             ticker = bot.exchange.get_tickers(symbol)[symbol]
         except Exception as e:
             bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
-                       format(bot.exchange_id, bot.session_uuid))
+                    format(bot.exchange_id, bot.session_uuid))
 
             bot.log(bot.LOG_ERROR, "Exception: {}".format(type(e).__name__))
             bot.log(bot.LOG_ERROR, "Exception body:", e.args)
@@ -367,7 +373,7 @@ while len(scalps.active_scalps) > 0:
         if ticker is not None:
             if prev_ticker is not None and ticker["bid"] == prev_ticker["bid"]:
 
-                new_buy_order_price = ticker["bid"]*(1-bot.profit)
+                new_buy_order_price = ticker["bid"] * (1 - bot.profit)
                 bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
                     new_buy_order_price, prev_ticker["bid"]))
             else:
