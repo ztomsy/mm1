@@ -39,8 +39,10 @@ class ScalpBot(tkgcore.Bot):
     def __init__(self, default_config: str, log_filename=None):
         super(ScalpBot, self).__init__(default_config, log_filename)
 
-        self.report_fields = list(["scalp-id", "status", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
-                                   "leg1-order-updates", "leg1-filled"])
+        self.report_fields = list(["scalp-id", "state", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
+                                   "leg1-order-state", "leg1-order-status", "leg1-order-updates", "leg1-filled",
+                                   "leg2-order-state", "leg2-order-status","leg2-order-filled",
+                                   "leg2-order1-updates"])
 
         self.om_proceed_sleep = 0.0
         self.symbol = ""
@@ -247,12 +249,24 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur1"] = str(_scalp.start_currency)
     report["cur2"] = str(_scalp.dest_currency)
     report["symbol"] = str(_scalp.symbol)
+    report["state"] = str(_scalp.state)
 
     if _scalp.order1 is not None and len(_scalp.order1.orders_history) > 0:
         report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count)
 
         report["leg1-filled"] = float(_scalp.order1.orders_history[0].filled / _scalp.order1.orders_history[0].amount) if\
             _scalp.order1.orders_history[0].amount != 0.0 else None
+
+        report["leg1-order-state"] = _scalp.order1.state
+        report["leg1-order-status"] = _scalp.order1.status
+
+    if _scalp.order2 is not None :
+        report["leg2-order-state"] = _scalp.order2.state
+        report["leg2-order-status"] = _scalp.order2.status
+        report["leg2-order-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.best_dest_amount
+
+        report["leg2-order1-updates"] = int(_scalp.order2.orders_history[0].update_requests_count) if \
+            len(_scalp.order2.orders_history) > 0 else None
 
     _bot.log_report(report)
     _bot.save_csv_report(report, "{}.csv".format(_scalp.id))
@@ -443,29 +457,6 @@ while len(scalps.active_scalps) > 0:
 
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
-
-            # if len(scalps.active_scalps) <= scalps.max_scalps and bot.run < bot.max_runs:
-            #     bot.log(bot.LOG_INFO, "Adding new scalp after order2 is complete  ")
-            #
-            #     bot.log(bot.LOG_INFO, "Fetching tickers...")
-            #
-            #     ticker = bot.exchange.get_tickers(symbol)[symbol]
-            #     new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency,
-            #                             profit_with_fee,
-            #                             bot.commission,
-            #                             bot.order1_max_updates,
-            #                             bot.order2_max_updates_for_profit,
-            #                             bot.order2_max_updates_market,
-            #                             bot.cancel_threshold
-            #                             )
-            #
-            #     scalps.add_scalp(new_scalp)
-            #
-            # # else:
-            #
-            # if scalps.scalps_added >= scalps.max_scalps - 1:
-            #     bot.run += 1
-            #     scalps.scalps_added = 0
 
         if len(om.get_open_orders()) > 0:
             om.proceed_orders()
