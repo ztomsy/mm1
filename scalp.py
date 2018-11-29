@@ -41,7 +41,7 @@ class ScalpBot(tkgcore.Bot):
 
         self.report_fields = list(["scalp-id", "state", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
                                    "leg1-order-state", "leg1-order-status", "leg1-order-updates", "leg1-filled",
-                                   "leg2-order-state", "leg2-order-status","leg2-order-filled",
+                                   "leg2-order-state", "leg2-order-status","leg2-filled",
                                    "leg2-order1-updates"])
 
         self.om_proceed_sleep = 0.0
@@ -263,7 +263,7 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     if _scalp.order2 is not None :
         report["leg2-order-state"] = _scalp.order2.state
         report["leg2-order-status"] = _scalp.order2.status
-        report["leg2-order-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.best_dest_amount
+        report["leg2-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.best_dest_amount
 
         report["leg2-order1-updates"] = int(_scalp.order2.orders_history[0].update_requests_count) if \
             len(_scalp.order2.orders_history) > 0 else None
