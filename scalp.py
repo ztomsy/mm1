@@ -319,7 +319,11 @@ om.LOG_ERROR = bot.LOG_ERROR
 om.LOG_DEBUG = bot.LOG_DEBUG
 om.LOG_CRITICAL = bot.LOG_CRITICAL
 
-scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
+scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee,
+                    bot.commission, bot.order1_max_updates, bot.order2_max_updates_for_profit,
+                    bot.order2_max_updates_market,
+                    bot.cancel_threshold)
+
 scalps = ScalpsCollection(bot.max_active_scalps)
 scalps.add_scalp(scalp)
 

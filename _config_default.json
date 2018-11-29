@@ -8,6 +8,7 @@
   "start_amount": 0.01,
   "profit": 0.001,
   "commission" : 0.00075,
+  "cancel_threshold": 0.002,
   "max_active_scalps": 10,
   "max_buy_orders_per_run":  5,
   "max_runs": 3,
