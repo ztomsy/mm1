@@ -372,7 +372,7 @@ while len(scalps.active_scalps) > 0:
         break
 
     # create new scalp if  have not executed total amount of scalps
-    if scalps_in_oder1 < bot.max_buy_orders_per_run and len(
+    if len(
             scalps.active_scalps) < scalps.max_scalps and bot.run < bot.max_runs:
         bot.log(bot.LOG_INFO, "Adding new scalp  ")
         bot.log(bot.LOG_INFO, "Fetching tickers...")
@@ -391,11 +391,13 @@ while len(scalps.active_scalps) > 0:
         if ticker is not None:
             if prev_ticker is not None and ticker["bid"] == prev_ticker["bid"]:
 
-                new_buy_order_price = ticker["bid"] * (1 - bot.profit)
+                new_buy_order_price = ticker["bid"] * (1 - 3*bot.profit)
                 bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
-                    new_buy_order_price, prev_ticker["bid"]))
+                    new_buy_order_price, prev_ticker["bid"]))                
+
+
             else:
-                new_buy_order_price = ticker["bid"]
+                new_buy_order_price = ticker["bid"]*(1 - 2*bot.profit)
 
             prev_ticker = ticker
 
