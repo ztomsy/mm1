@@ -333,7 +333,7 @@ while len(scalps.active_scalps) > 0:
         if ticker is not None:
             if prev_ticker is not None and ticker["bid"] <= prev_ticker["bid"]:
 
-                new_buy_order_price = ticker["bid"] * (1 - profit_with_fee)
+                new_buy_order_price = ticker["bid"] * (1 - profit_with_fee*bot.buy_coeff)
                 bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
                     new_buy_order_price, prev_ticker["bid"]))                
 

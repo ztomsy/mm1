@@ -29,6 +29,7 @@ class ScalpBot(tkgcore.Bot):
         self.start_amount = 0.0
         self.profit = 0.0
         self.commission = 0.0
+        self.buy_coeff = 0.0
 
         self.total_result = 0.0
         self.max_active_scalps = 0  # maximum number of live active scalps
