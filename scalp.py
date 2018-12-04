@@ -2,6 +2,7 @@ import tkgcore
 from tkgcore import TradeOrder
 from tkgcore import OrderWithAim
 from tkgcore import RecoveryOrder
+from scalp_bot import ScalpBot
 import uuid
 import sys
 import csv
@@ -258,7 +259,7 @@ start_amount = bot.start_amount
 profit = bot.profit
 commission = bot.commission
 
-profit_with_fee = bot.target_profit()  # target profit considering commission
+profit_with_fee = bot.target_single_order_profit(profit, commission)  # target profit considering commission
 scalps_to_do = bot.scalps_to_do  # number of consecutive scalp runs
 
 bot.run = 1  # current run
@@ -330,15 +331,15 @@ while len(scalps.active_scalps) > 0:
             bot.log(bot.LOG_ERROR, "Exception body:", e.args)
 
         if ticker is not None:
-            if prev_ticker is not None and ticker["bid"] == prev_ticker["bid"]:
+            if prev_ticker is not None and ticker["bid"] <= prev_ticker["bid"]:
 
-                new_buy_order_price = ticker["bid"] * (1 - 3*bot.profit)
+                new_buy_order_price = ticker["bid"] * (1 - profit_with_fee)
                 bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
                     new_buy_order_price, prev_ticker["bid"]))                
 
 
             else:
-                new_buy_order_price = ticker["bid"]*(1 - 2*bot.profit)
+                new_buy_order_price = ticker["bid"]*(1 - 0*profit_with_fee)
 
             prev_ticker = ticker
 

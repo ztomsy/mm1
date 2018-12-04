@@ -68,14 +68,14 @@ class ScalpBot(tkgcore.Bot):
                 writer.writeheader()
             writer.writerow(report)
 
-    def target_profit(self, target_profit: float = None, commission_fee: float = None):
+    def target_single_order_profit(self, target_profit: float = None, commission_fee: float = None):
 
         target_profit = self.profit if target_profit is None else target_profit
         commission_fee = self.profit if commission_fee is None else commission_fee
 
         #t_p = 2 - (((1 - commission_fee) ** 2) / (1 + target_profit))
 
-        t_p = (1+target_profit) / ((1-commission_fee)**2)
+        t_p = (1+target_profit) / ((1-commission_fee)**2) - 1
 
         # self.profit / ((1 - self.commission) ** 2)
         return t_p
