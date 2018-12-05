@@ -167,6 +167,7 @@ class ScalpBot(tkgcore.Bot):
         self.profit = 0.0
         self.commission = 0.0
         self.depth_step_in_profits = 0.0
+        self.first_order_price_margin_in_profits_with_fees = 0.0
 
         self.total_result = 0.0
         self.max_active_scalps = 0  # maximum number of live active scalps
@@ -209,7 +210,7 @@ class ScalpBot(tkgcore.Bot):
     def target_single_order_profit(self, target_profit: float = None, commission_fee: float = None):
 
         target_profit = self.profit if target_profit is None else target_profit
-        commission_fee = self.profit if commission_fee is None else commission_fee
+        commission_fee = self.commission if commission_fee is None else commission_fee
 
         #t_p = 2 - (((1 - commission_fee) ** 2) / (1 + target_profit))
 

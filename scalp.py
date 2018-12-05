@@ -12,6 +12,9 @@ import copy
 def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
+    _bot.log(_bot.LOG_INFO, "Symbol: {}".format(_scalp.symbol))
+    _bot.log(_bot.LOG_INFO, "Direction  {}->{}".format(_scalp.start_currency, _scalp.dest_currency))
+
     _bot.log(_bot.LOG_INFO,
              "State: {}. Depth: {}, Order1: price:{} status:{} filled:{}/{} (upd:{}/{}). Order2: price:{} status:{} state:{} filled:{}/{} (upd "
              "{}/{}) ".
@@ -61,6 +64,7 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur2"] = str(_scalp.dest_currency)
     report["symbol"] = str(_scalp.symbol)
     report["state"] = str(_scalp.state)
+    report["depth"] = str(_scalp.depth)
 
     if _scalp.order1 is not None and len(_scalp.order1.orders_history) > 0:
         report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count)
@@ -135,6 +139,7 @@ bot.run = 1  # current run
 total_result = 0.0
 
 ticker = bot.exchange.get_tickers(symbol)[symbol]
+
 depth = 1
 
 om = tkgcore.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
@@ -145,8 +150,22 @@ om.LOG_ERROR = bot.LOG_ERROR
 om.LOG_DEBUG = bot.LOG_DEBUG
 om.LOG_CRITICAL = bot.LOG_CRITICAL
 
+order1_side = tkgcore.core.get_order_type(start_currency, dest_currency, symbol)
+
+if order1_side == "buy":
+    start_price = ticker["bid"]*(1 - profit_with_fee*bot.first_order_price_margin_in_profits_with_fees
+                                 - (depth-1)*bot.depth_step_in_profits*bot.profit)
+elif order1_side == "sell":
+    start_price = ticker["ask"] * (1 + profit_with_fee * bot.first_order_price_margin_in_profits_with_fees
+                                   + (depth - 1) * bot.depth_step_in_profits*bot.profit)
+else:
+    bot.log(bot.LOG_ERROR, "Wrong symbol")
+    sys.exit()
+
+bot.log(bot.LOG_CRITICAL, "Init ticker:{}".format(start_price))
+
 scalp = SingleScalp(symbol, start_currency, start_amount, depth,
-                    ticker["bid"]*(1 - profit_with_fee - (depth-1)*bot.depth_step_in_profits), dest_currency,
+                    start_price, dest_currency,
                     profit_with_fee, bot.commission, bot.order1_max_updates, bot.order2_max_updates_for_profit,
                     bot.order2_max_updates_market,
                     bot.cancel_threshold)
@@ -207,7 +226,14 @@ while len(scalps.active_scalps) > 0:
 
             for depth in depth_levels_to_add:
 
-                price = ticker["bid"]*(1 - profit_with_fee - (depth-1)*bot.depth_step_in_profits*bot.profit)
+                if order1_side == "buy":
+                    price = ticker["bid"]*(1 - profit_with_fee*bot.first_order_price_margin_in_profits_with_fees
+                                           - (depth-1)*bot.depth_step_in_profits*bot.profit)
+                else:
+                    price = ticker["ask"] * (1 + profit_with_fee * bot.first_order_price_margin_in_profits_with_fees
+                                   + (depth - 1) * bot.depth_step_in_profits*bot.profit)
+
+
                 profit_with_fee_and_depth = profit_with_fee + bot.profit*bot.depth_step_in_profits*(depth-1)
 
                 new_scalp = SingleScalp(symbol, start_currency, start_amount, depth, price, dest_currency,
