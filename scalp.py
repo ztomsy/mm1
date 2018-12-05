@@ -208,9 +208,10 @@ while len(scalps.active_scalps) > 0:
             for depth in depth_levels_to_add:
 
                 price = ticker["bid"]*(1 - profit_with_fee - (depth-1)*bot.depth_step_in_profits*bot.profit)
+                profit_with_fee_and_depth = profit_with_fee + bot.profit*bot.depth_step_in_profits*(depth-1)
 
                 new_scalp = SingleScalp(symbol, start_currency, start_amount, depth, price, dest_currency,
-                                        profit_with_fee,
+                                        profit_with_fee_and_depth,
                                         bot.commission,
                                         bot.order1_max_updates,
                                         bot.order2_max_updates_for_profit,
