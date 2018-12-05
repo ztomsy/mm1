@@ -7,7 +7,7 @@
   "dest_currency": "ETH",
   "start_amount": 0.01,
   "profit": 0.001,
-  "buy_coeff": 2,
+  "depth_step_in_profits": 0.5,
   "commission" : 0.00075,
   "cancel_threshold": 0.002,
   "max_active_scalps": 10,

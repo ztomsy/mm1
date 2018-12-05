@@ -1,9 +1,6 @@
 import tkgcore
-from tkgcore import TradeOrder
 from tkgcore import OrderWithAim
-from tkgcore import RecoveryOrder
-from scalp_bot import ScalpBot
-import uuid
+from scalp_bot import ScalpBot, ScalpsCollection, SingleScalp
 import sys
 import csv
 import os
@@ -12,141 +9,13 @@ from typing import Dict, Tuple, List
 import copy
 
 
-class FokOrder(OrderWithAim):
-    """
-    implement basic FOK order by limiting maximum trade order updates and than cancel
-    """
-
-    def _init(self):
-        super()._init()
-        self.state = "fok"  # just to make things a little pretty
-
-    # redefine the _on_open_order checker to cancel active trade order if the number of order updates more
-    # than max_order_updates
-    def _on_open_order(self, active_trade_order: TradeOrder):
-        if active_trade_order.update_requests_count >= self.max_order_updates \
-                and active_trade_order.amount - active_trade_order.filled > self.cancel_threshold:
-            return "cancel"
-        return "hold"
-
-    def new_scalp_from_ticker(self):
-        ticker = bot.exchange.get_tickers(symbol)[symbol]
-        new_scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee)
-        return new_scalp
-
-
-
-
-class SingleScalp(object):
-
-    def __init__(self, symbol: str, start_currency: str, amount_start: float, start_price: float, dest_currency: str,
-                 profit: float,
-                 commission: float = 0.001,
-                 order1_max_updates: int = 5,
-                 order2_max_updates_for_profit: int = 50,
-                 order2_max_updates_market: int = 5,
-                 cancel_threshold: float = 0.0):
-
-        self.symbol = symbol
-
-        self.start_currency = start_currency
-        self.start_amount = amount_start
-        self.start_price = start_price
-
-        self.dest_currency = dest_currency
-        self.profit = profit
-
-        self.commission = commission
-        self.order1_max_updates = order1_max_updates
-        self.order2_max_updates_for_profit = order2_max_updates_for_profit
-        self.order2_max_updates_market = order2_max_updates_market
-
-        self.cancel_threshold = cancel_threshold
-
-        self.order1 = None  # type: FokOrder
-        self.order2 = None  # type: RecoveryOrder
-
-        self.result_fact_diff = 0.0
-
-        self.id = str(uuid.uuid4())
-        self.state = "new"  # "order1","order1_complete", "order1_not_filled",  "order2", "closed"
-
-    def create_order1(self):
-        order1 = FokOrder.create_from_start_amount(self.symbol, self.start_currency, self.start_amount,
-                                                   self.dest_currency, self.start_price, self.cancel_threshold,
-                                                   self.order1_max_updates)
-        self.order1 = order1
-        self.state = "order1"
-
-        return order1
-
-    def create_order2(self):
-        order2_target_amount = self.order1.filled_start_amount * (1 + self.profit)
-
-        order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
-                               order2_target_amount, self.commission, self.cancel_threshold,
-                               self.order2_max_updates_for_profit,
-                               self.order2_max_updates_market)
-
-        self.state = "order2"
-
-        self.order2 = order2
-        return order2
-
-    def update_state(self, order1_status: str, order2_status: str):
-
-        if self.state == "new" and order1_status == "open":
-            self.state = "order1"
-            return self.state
-
-        if self.state == "order1" and order1_status == "closed" and self.order1.filled > 0:
-            self.state = "order1_complete"
-            return self.state
-
-        if self.state == "order1" and order1_status == "closed" and self.order1.filled <= 0:
-            self.state = "closed"
-            self.result_fact_diff = 0
-            return self.state
-
-        if self.state == "order1_complete" and order2_status == "open":
-            self.state = "order2"
-            return self.state
-
-        if self.state == "order2" and order2_status == "closed":
-            self.state = "closed"
-            self.result_fact_diff = self.order2.filled_dest_amount - self.order1.filled_start_amount
-            return self.state
-
-
-class ScalpsCollection(object):
-    def __init__(self, max_scalps: int = 1):
-        self.max_scalps = max_scalps
-        self.active_scalps = dict()  # type: Dict[str, SingleScalp]
-        self.scalps_order1_complete = 0  # type: int
-
-    def _report_scalp_add(self, scalp_id):
-        print("Scalp ID: {} was added".format(scalp_id))
-
-    def _report_scalp_removed(self, scalp_id):
-        print("Scalp ID: {} was removed".format(scalp_id))
-
-    def add_scalp(self, single_scalp: SingleScalp = None):
-        self.active_scalps[single_scalp.id] = single_scalp
-
-        self._report_scalp_add(single_scalp.id)
-
-    def remove_scalp(self, scalp_id: str):
-        self.active_scalps.pop(scalp_id)
-        self._report_scalp_removed(scalp_id)
-
-
 def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
     _bot.log(_bot.LOG_INFO,
-             "State: {}. Order1: price:{} status:{} filled:{}/{} (upd:{}/{}). Order2: price:{} status:{} state:{} filled:{}/{} (upd "
+             "State: {}. Depth: {}, Order1: price:{} status:{} filled:{}/{} (upd:{}/{}). Order2: price:{} status:{} state:{} filled:{}/{} (upd "
              "{}/{}) ".
-             format(_scalp.state,
+             format(_scalp.state, _scalp.depth,
                     _scalp.order1.price if _scalp.order1 is not None else None,
                     _scalp.order1.status if _scalp.order1 is not None else None,
                     _scalp.order1.filled if _scalp.order1 is not None else None,
@@ -266,6 +135,7 @@ bot.run = 1  # current run
 total_result = 0.0
 
 ticker = bot.exchange.get_tickers(symbol)[symbol]
+depth = 1
 
 om = tkgcore.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
 # om.log = lambda x, y: x
@@ -275,8 +145,9 @@ om.LOG_ERROR = bot.LOG_ERROR
 om.LOG_DEBUG = bot.LOG_DEBUG
 om.LOG_CRITICAL = bot.LOG_CRITICAL
 
-scalp = SingleScalp(symbol, start_currency, start_amount, ticker["bid"], dest_currency, profit_with_fee,
-                    bot.commission, bot.order1_max_updates, bot.order2_max_updates_for_profit,
+scalp = SingleScalp(symbol, start_currency, start_amount, depth,
+                    ticker["bid"]*(1 - profit_with_fee - (depth-1)*bot.depth_step_in_profits), dest_currency,
+                    profit_with_fee, bot.commission, bot.order1_max_updates, bot.order2_max_updates_for_profit,
                     bot.order2_max_updates_market,
                     bot.cancel_threshold)
 
@@ -331,28 +202,23 @@ while len(scalps.active_scalps) > 0:
             bot.log(bot.LOG_ERROR, "Exception body:", e.args)
 
         if ticker is not None:
-            if prev_ticker is not None and ticker["bid"] <= prev_ticker["bid"]:
 
-                new_buy_order_price = ticker["bid"] * (1 - profit_with_fee*bot.buy_coeff)
-                bot.log(bot.LOG_INFO, "Reducing price because of the same tickers. New price {} (was)".format(
-                    new_buy_order_price, prev_ticker["bid"]))                
+            depth_levels_to_add = scalps.missed_scalps_depth("order1", bot.max_active_scalps)
 
+            for depth in depth_levels_to_add:
 
-            else:
-                new_buy_order_price = ticker["bid"]*(1 - 0*profit_with_fee)
+                price = ticker["bid"]*(1 - profit_with_fee - (depth-1)*bot.depth_step_in_profits*bot.profit)
 
-            prev_ticker = ticker
+                new_scalp = SingleScalp(symbol, start_currency, start_amount, depth, price, dest_currency,
+                                        profit_with_fee,
+                                        bot.commission,
+                                        bot.order1_max_updates,
+                                        bot.order2_max_updates_for_profit,
+                                        bot.order2_max_updates_market,
+                                        bot.cancel_threshold
+                                        )
 
-            new_scalp = SingleScalp(symbol, start_currency, start_amount, new_buy_order_price, dest_currency,
-                                    profit_with_fee,
-                                    bot.commission,
-                                    bot.order1_max_updates,
-                                    bot.order2_max_updates_for_profit,
-                                    bot.order2_max_updates_market,
-                                    bot.cancel_threshold
-                                    )
-
-            scalps.add_scalp(new_scalp)
+                scalps.add_scalp(new_scalp)
 
     if scalps.scalps_order1_complete >= bot.max_buy_orders_per_run - 1 and bot.run < bot.max_runs:
         bot.run += 1
@@ -402,9 +268,9 @@ while len(scalps.active_scalps) > 0:
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 
-        if len(om.get_open_orders()) > 0:
-            om.proceed_orders()
-            time.sleep(bot.om_proceed_sleep)
+    if len(om.get_open_orders()) > 0:
+        om.proceed_orders()
+    time.sleep(bot.om_proceed_sleep)
 
 bot.log(bot.LOG_INFO, "")
 bot.log(bot.LOG_INFO, "")
