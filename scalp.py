@@ -176,7 +176,7 @@ scalps.add_scalp(scalp)
 scalps_added = 0
 prev_ticker = None
 
-while len(scalps.active_scalps) > 0:
+while True:
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "")
     bot.log(bot.LOG_INFO, "")
@@ -199,7 +199,7 @@ while len(scalps.active_scalps) > 0:
 
     active_scalps = list(scalps.active_scalps.values())
 
-    if bot.run > bot.max_runs and len(active_scalps) == 0:
+    if bot.run >= bot.max_runs and len(active_scalps) == 0:
         bot.log(bot.LOG_INFO, "Max runs reached {}/{} and no active scalps.".format(bot.run, bot.max_runs))
         break
 
