@@ -247,7 +247,7 @@ while len(scalps.active_scalps) > 0:
 
                 scalps.add_scalp(new_scalp)
 
-    if scalps.scalps_order1_complete >= bot.max_buy_orders_per_run - 1 and bot.run < bot.max_runs:
+    if scalps.scalps_order1_complete >= bot.max_active_scalps and bot.run < bot.max_runs:
         bot.run += 1
         scalps.scalps_order1_complete = 0
 
