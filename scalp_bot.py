@@ -169,6 +169,10 @@ class ScalpBot(tkgcore.Bot):
         self.depth_step_in_profits = 0.0
         self.first_order_price_margin_in_profits_with_fees = 0.0
 
+        self.ma_long_window = 0  # length of ma long window
+        self.ma_short_window = 0
+        self.ma_count = 0
+
         self.total_result = 0.0
         self.max_active_scalps = 0  # maximum number of live active scalps
         self.max_buy_orders_per_run = 0

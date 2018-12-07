@@ -171,10 +171,16 @@ scalp = SingleScalp(symbol, start_currency, start_amount, depth,
                     bot.cancel_threshold)
 
 scalps = ScalpsCollection(bot.max_active_scalps)
-scalps.add_scalp(scalp)
+# scalps.add_scalp(scalp)
 
 scalps_added = 0
 prev_ticker = None
+
+tickers_hist = dict()
+tickers_hist["ask"] = list()
+tickers_hist["bid"] = list()
+
+ticker_history_len = bot.ma_long_window + bot.ma_count
 
 while True:
     bot.log(bot.LOG_INFO, "")
@@ -203,22 +209,60 @@ while True:
         bot.log(bot.LOG_INFO, "Max runs reached {}/{} and no active scalps.".format(bot.run, bot.max_runs))
         break
 
+    try:
+        bot.log(bot.LOG_INFO, "Getting ticker. Tickers collected {}/{}".format(len(tickers_hist["ask"]), bot.ma_long_window) )
+        new_buy_order_price = None
+        ticker = None
+        ticker = bot.exchange.get_tickers(symbol)[symbol]
+    except Exception as e:
+        bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
+                format(bot.exchange_id, bot.session_uuid))
+
+        bot.log(bot.LOG_ERROR, "Exception: {}".format(type(e).__name__))
+        bot.log(bot.LOG_ERROR, "Exception body:", e.args)
+
+    if ticker is not None and ticker["ask"] is not None \
+            and ticker["bid"] is not None and ticker["ask"] > 0 and ticker["bid"] > 0:
+
+        tickers_hist["ask"].append(ticker["ask"])
+        tickers_hist["bid"].append(ticker["bid"])
+
+        if (len(tickers_hist["ask"])) > ticker_history_len :
+            tickers_hist["ask"] = tickers_hist["ask"][-ticker_history_len:]
+
+        if (len(tickers_hist["bid"])) > ticker_history_len:
+            tickers_hist["bid"] = tickers_hist["bid"][-ticker_history_len:]
+
+    if len(tickers_hist["ask"]) < ticker_history_len:
+        bot.log(bot.LOG_INFO, "Still collecting tickers {}/{}".format(len(tickers_hist["ask"]), ticker_history_len))
+        continue
+
+    else:
+        bot.log(bot.LOG_INFO, "Collecting tickers done {}/{}".format(len(tickers_hist["ask"]), ticker_history_len))
+        ma_long = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_long_window)
+        ma_short = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_short_window)
+        bot.log(bot.LOG_INFO, "Last ma_long:{}".format(ma_long[-1:]))
+        bot.log(bot.LOG_INFO, "Last ma_short:{}".format(ma_short[-1:]))
+
+    ok_to_add_scapls = False
+
+    if order1_side == "buy" and ( ma_short[-1:] > ma_long[-1:]):
+        bot.log(bot.LOG_INFO, "Going to buy->sell. ma_short {} greater than ma_long{}.".format(ma_short[-1:],
+                                                                                               ma_long[-1:]))
+        ok_to_add_scapls = True
+
+    if order1_side == "sell" and (ma_short[-1:] < ma_long[-1:]):
+        bot.log(bot.LOG_INFO, "Going to sell->buy. ma_short less than ma_long. Skipping".format(ma_short[-1:],
+                                                                                                ma_long[-1:]))
+        ok_to_add_scapls = True
+
+    if bot.offline:
+        bot.log(bot.LOG_INFO, "Fetch_id {}".format(bot.exchange._offline_tickers_current_index-1))
+
     # create new scalp if  have not executed total amount of scalps
-    if len(
-            scalps.active_scalps) < scalps.max_scalps and bot.run <= bot.max_runs:
+    if len(scalps.active_scalps) < scalps.max_scalps and bot.run <= bot.max_runs and ok_to_add_scapls:
+
         bot.log(bot.LOG_INFO, "Adding new scalp  ")
-        bot.log(bot.LOG_INFO, "Fetching tickers...")
-
-        try:
-            new_buy_order_price = None
-            ticker = None
-            ticker = bot.exchange.get_tickers(symbol)[symbol]
-        except Exception as e:
-            bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
-                    format(bot.exchange_id, bot.session_uuid))
-
-            bot.log(bot.LOG_ERROR, "Exception: {}".format(type(e).__name__))
-            bot.log(bot.LOG_ERROR, "Exception body:", e.args)
 
         if ticker is not None and ticker["ask"] is not None \
                 and ticker["bid"] is not None and ticker["ask"] > 0 and ticker["bid"] > 0:
