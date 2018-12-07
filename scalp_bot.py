@@ -172,6 +172,7 @@ class ScalpBot(tkgcore.Bot):
         self.ma_long_window = 0  # length of ma long window
         self.ma_short_window = 0
         self.ma_count = 0
+        self.ma_short_long_threshold = 0.0 # threshhold
 
         self.total_result = 0.0
         self.max_active_scalps = 0  # maximum number of live active scalps

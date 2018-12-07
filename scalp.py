@@ -205,15 +205,22 @@ while True:
 
     active_scalps = list(scalps.active_scalps.values())
 
-    if bot.run >= bot.max_runs and len(active_scalps) == 0:
+    if bot.run > bot.max_runs and len(active_scalps) == 0:
         bot.log(bot.LOG_INFO, "Max runs reached {}/{} and no active scalps.".format(bot.run, bot.max_runs))
         break
+
+    ticker = None
+    ok_to_add_scapls = False
+
+    # # request tickers if only going to add scalps:
+    # if len(scalps.active_scalps) < scalps.max_scalps and bot.run <= bot.max_runs:
 
     try:
         bot.log(bot.LOG_INFO, "Getting ticker. Tickers collected {}/{}".format(len(tickers_hist["ask"]), bot.ma_long_window) )
         new_buy_order_price = None
-        ticker = None
+
         ticker = bot.exchange.get_tickers(symbol)[symbol]
+
     except Exception as e:
         bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
                 format(bot.exchange_id, bot.session_uuid))
@@ -239,21 +246,43 @@ while True:
 
     else:
         bot.log(bot.LOG_INFO, "Collecting tickers done {}/{}".format(len(tickers_hist["ask"]), ticker_history_len))
-        ma_long = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_long_window)
-        ma_short = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_short_window)
+
+        if order1_side == "buy":
+            bot.log(bot.LOG_INFO, "Use ASK for MAs")
+            ma_long = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_long_window)
+            ma_short = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_short_window)
+        else:
+            bot.log(bot.LOG_INFO, "Use BID for MAs")
+            ma_long = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_long_window)
+            ma_short = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_short_window)
+
         bot.log(bot.LOG_INFO, "Last ma_long:{}".format(ma_long[-1:]))
         bot.log(bot.LOG_INFO, "Last ma_short:{}".format(ma_short[-1:]))
 
     ok_to_add_scapls = False
 
-    if order1_side == "buy" and ( ma_short[-1:] > ma_long[-1:]):
-        bot.log(bot.LOG_INFO, "Going to buy->sell. ma_short {} greater than ma_long{}.".format(ma_short[-1:],
-                                                                                               ma_long[-1:]))
+    ma_short_last = ma_short[-1:].item()
+    ma_long_last = ma_long[-1:].item()
+
+    if ma_short_last != 0:
+        ma_short_long_rel_delta = (ma_short_last - ma_long_last) / ma_short_last
+    else:
+        ma_short_long_rel_delta = None
+
+    if order1_side == "buy" and ma_short_long_rel_delta is not None \
+            and ( ma_short_long_rel_delta > bot.ma_short_long_threshold):
+
+        bot.log(bot.LOG_INFO, "Going to buy->sell. ma_short {} greater than ma_long{} more than threshold {}.".format(
+            ma_short_last, ma_long_last, bot.ma_short_long_threshold))
+
         ok_to_add_scapls = True
 
-    if order1_side == "sell" and (ma_short[-1:] < ma_long[-1:]):
-        bot.log(bot.LOG_INFO, "Going to sell->buy. ma_short less than ma_long. Skipping".format(ma_short[-1:],
-                                                                                                ma_long[-1:]))
+    if order1_side == "sell" and ma_short_long_rel_delta is not None and  \
+            (ma_short_long_rel_delta < bot.ma_short_long_threshold):
+
+        bot.log(bot.LOG_INFO, "Going to sell->buy. ma_short less than ma_long less than rel. threshold {}.".format(
+            ma_short_last, ma_long_last, bot.ma_short_long_threshold))
+
         ok_to_add_scapls = True
 
     if bot.offline:
@@ -292,7 +321,7 @@ while True:
 
                 scalps.add_scalp(new_scalp)
 
-    if scalps.scalps_order1_complete >= bot.max_active_scalps and bot.run < bot.max_runs:
+    if scalps.scalps_order1_complete >= bot.max_active_scalps and bot.run <= bot.max_runs:
         bot.run += 1
         scalps.scalps_order1_complete = 0
 

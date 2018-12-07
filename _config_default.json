@@ -13,7 +13,7 @@
   "ma_long_window": 100,
   "ma_short_window": 90,
   "ma_count": 10,
-
+  "ma_short_long_threshold": 0.00005,
   "cancel_threshold": 0.002,
   "max_active_scalps": 10,
   "max_buy_orders_per_run":  5,
