@@ -267,9 +267,6 @@ while True:
             ma_long = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_long_window)
             ma_short = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_short_window)
 
-        bot.log(bot.LOG_INFO, "Last ma_long:{}".format(ma_long[-1:]))
-        bot.log(bot.LOG_INFO, "Last ma_short:{}".format(ma_short[-1:]))
-
     ok_to_add_scapls = False
 
     ma_short_last = ma_short[-1:].item()
@@ -279,6 +276,11 @@ while True:
         ma_short_long_rel_delta = (ma_short_last - ma_long_last) / ma_short_last
     else:
         ma_short_long_rel_delta = None
+
+    bot.log(bot.LOG_INFO, "Last ma_long:{}".format(ma_long[-1:]))
+    bot.log(bot.LOG_INFO, "Last ma_short:{}".format(ma_short[-1:]))
+    bot.log(bot.LOG_INFO, "Delta relative short long / threshold :{}/{}".format(ma_short_long_rel_delta,
+                                                                                bot.ma_short_long_threshold))
 
     if order1_side == "buy" and ma_short_long_rel_delta is not None \
             and ( ma_short_long_rel_delta > bot.ma_short_long_threshold):
