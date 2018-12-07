@@ -205,7 +205,7 @@ while True:
 
     # create new scalp if  have not executed total amount of scalps
     if len(
-            scalps.active_scalps) < scalps.max_scalps and bot.run < bot.max_runs:
+            scalps.active_scalps) < scalps.max_scalps and bot.run <= bot.max_runs:
         bot.log(bot.LOG_INFO, "Adding new scalp  ")
         bot.log(bot.LOG_INFO, "Fetching tickers...")
 
@@ -220,7 +220,8 @@ while True:
             bot.log(bot.LOG_ERROR, "Exception: {}".format(type(e).__name__))
             bot.log(bot.LOG_ERROR, "Exception body:", e.args)
 
-        if ticker is not None:
+        if ticker is not None and ticker["ask"] is not None \
+                and ticker["bid"] is not None and ticker["ask"] > 0 and ticker["bid"] > 0:
 
             depth_levels_to_add = scalps.missed_scalps_depth("order1", bot.max_active_scalps)
 
