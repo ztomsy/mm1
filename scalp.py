@@ -7,7 +7,7 @@ import os
 import time
 from typing import Dict, Tuple, List
 import copy
-
+import datetime
 
 def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
@@ -65,6 +65,17 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["symbol"] = str(_scalp.symbol)
     report["state"] = str(_scalp.state)
     report["depth"] = str(_scalp.depth)
+
+    report["ticker_price"] = _scalp.supplementary["ticker_price"]
+    report["ma_short"] = _scalp.supplementary["ma_short"]
+    report["ma_long"] = _scalp.supplementary["ma_long"]
+    report["ma_short_long_rel_delta"] = _scalp.supplementary["ma_short_long_rel_delta"]
+    report["time_created_utc"] = _scalp.supplementary["time_created_utc"]
+    report["order1_side"] = _scalp.supplementary["order1_side"]
+
+    report["ma_short_window"] = _bot.ma_short_window
+    report["ma_long_window"] = _bot.ma_long_window
+    report["ma_short_long_threshold"] = _bot.ma_short_long_threshold
 
     if _scalp.order1 is not None and len(_scalp.order1.orders_history) > 0:
         report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count)
@@ -278,7 +289,7 @@ while True:
         ok_to_add_scapls = True
 
     if order1_side == "sell" and ma_short_long_rel_delta is not None and  \
-            (ma_short_long_rel_delta < bot.ma_short_long_threshold):
+            (ma_short_long_rel_delta < -bot.ma_short_long_threshold):
 
         bot.log(bot.LOG_INFO, "Going to sell->buy. ma_short less than ma_long less than rel. threshold {}.".format(
             ma_short_last, ma_long_last, bot.ma_short_long_threshold))
@@ -318,6 +329,14 @@ while True:
                                         bot.order2_max_updates_market,
                                         bot.cancel_threshold
                                         )
+
+                new_scalp.supplementary["ticker_price"] = price
+                new_scalp.supplementary["order1_side"] = order1_side
+                new_scalp.supplementary["ma_short"] = ma_short_last
+                new_scalp.supplementary["ma_long"] = ma_long_last
+                new_scalp.supplementary["ma_short_long_rel_delta"] = ma_short_long_rel_delta
+                new_scalp.supplementary["time_created_utc"] = datetime.datetime.utcnow()
+
 
                 scalps.add_scalp(new_scalp)
 

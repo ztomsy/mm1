@@ -48,6 +48,8 @@ class SingleScalp(object):
         self.id = str(uuid.uuid4())
         self.state = "new"  # "order1","order1_complete", "order1_not_filled",  "order2", "closed"
 
+        self.supplementary = dict()  # for stats and additional data
+
     def create_order1(self):
         order1 = FokOrder.create_from_start_amount(self.symbol, self.start_currency, self.start_amount,
                                                    self.dest_currency, self.start_price, self.cancel_threshold,
@@ -154,6 +156,10 @@ class ScalpBot(tkgcore.Bot):
         super(ScalpBot, self).__init__(default_config, log_filename)
 
         self.report_fields = list(["scalp-id", "state", "result-fact-diff", "start-qty", "cur1", "cur2", "symbol",
+                                   "depth", "order1_side", "ticker_price",
+                                   "ma_short_window", "ma_long_window", "ma_short_long_threshold",
+                                   "ma_short", "ma_long", "ma_short_long_rel_delta",
+                                   "time_created_utc",
                                    "leg1-order-state", "leg1-order-status", "leg1-order-updates", "leg1-filled",
                                    "leg2-order-state", "leg2-order-status","leg2-filled",
                                    "leg2-order1-updates"])
