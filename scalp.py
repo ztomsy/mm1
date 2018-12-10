@@ -64,18 +64,18 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur2"] = str(_scalp.dest_currency)
     report["symbol"] = str(_scalp.symbol)
     report["state"] = str(_scalp.state)
-    report["depth"] = str(_scalp.depth)
+    report["depth"] = int(_scalp.depth)
 
-    report["ticker_price"] = _scalp.supplementary["ticker_price"]
-    report["ma_short"] = _scalp.supplementary["ma_short"]
-    report["ma_long"] = _scalp.supplementary["ma_long"]
-    report["ma_short_long_rel_delta"] = _scalp.supplementary["ma_short_long_rel_delta"]
-    report["time_created_utc"] = _scalp.supplementary["time_created_utc"]
-    report["order1_side"] = _scalp.supplementary["order1_side"]
+    report["ticker_price"] = float(_scalp.supplementary["ticker_price"])
+    report["ma_short"] = float(_scalp.supplementary["ma_short"])
+    report["ma_long"] = float(_scalp.supplementary["ma_long"])
+    report["ma_short_long_rel_delta"] = float(_scalp.supplementary["ma_short_long_rel_delta"])
+    report["time_created_utc"] = str(_scalp.supplementary["time_created_utc"])
+    report["order1_side"] = str(_scalp.supplementary["order1_side"])
 
-    report["ma_short_window"] = _bot.ma_short_window
-    report["ma_long_window"] = _bot.ma_long_window
-    report["ma_short_long_threshold"] = _bot.ma_short_long_threshold
+    report["ma_short_window"] = int(_bot.ma_short_window)
+    report["ma_long_window"] = int(_bot.ma_long_window)
+    report["ma_short_long_threshold"] = float(_bot.ma_short_long_threshold)
 
     if _scalp.order1 is not None and len(_scalp.order1.orders_history) > 0:
         report["leg1-order-updates"] = int(_scalp.order1.orders_history[0].update_requests_count)
