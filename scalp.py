@@ -79,6 +79,15 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["cur1-diff"] = _scalp.cur1_diff
     report["cur2-diff"] = _scalp.cur2_diff
 
+    report["diff-" + _scalp.start_currency] = _scalp.cur1_diff
+    report["diff-" + _scalp.dest_currency] = _scalp.cur2_diff
+
+    if "diff-" + _scalp.start_currency not in _bot.report_fields:
+        _bot.report_fields.append( "diff-" + _scalp.start_currency)
+
+    if "diff-" + _scalp.dest_currency not in _bot.report_fields:
+        _bot.report_fields.append("diff-" + _scalp.dest_currency)
+
     report["ticker_price"] = float(_scalp.supplementary["ticker_price"])
     report["ma_short"] = float(_scalp.supplementary["ma_short"])
     report["ma_long"] = float(_scalp.supplementary["ma_long"])
@@ -308,7 +317,6 @@ while True:
 
     if order1_side == "sell" and ma_short_long_rel_delta is not None and  \
             (ma_short_long_rel_delta < -bot.ma_short_long_threshold):
-
         bot.log(bot.LOG_INFO, "Going to sell->buy. ma_short less than ma_long less than rel. threshold {}.".format(
             ma_short_last, ma_long_last, bot.ma_short_long_threshold))
 
