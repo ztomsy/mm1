@@ -66,6 +66,19 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     report["state"] = str(_scalp.state)
     report["depth"] = int(_scalp.depth)
 
+    filled_start_cur, filled_dest_cur = 0.0, 0.0
+
+    # if _scalp.order1 is not None:
+    #     filled_start_cur = - _scalp.order1.filled_start_amount
+    #     filled_dest_cur = _scalp.order1.filled_dest_amount
+    #
+    # if _scalp.order2 is not None:
+    #     filled_start_cur += _scalp.order2.filled_dest_amount
+    #     filled_dest_cur -= _scalp.order2.filled_start_amount
+
+    report["cur1-diff"] = _scalp.cur1_diff
+    report["cur2-diff"] = _scalp.cur2_diff
+
     report["ticker_price"] = float(_scalp.supplementary["ticker_price"])
     report["ma_short"] = float(_scalp.supplementary["ma_short"])
     report["ma_long"] = float(_scalp.supplementary["ma_long"])
@@ -148,6 +161,9 @@ scalps_to_do = bot.scalps_to_do  # number of consecutive scalp runs
 
 bot.run = 1  # current run
 total_result = 0.0
+
+total_cur1_diff = 0.0
+total_cur2_diff = 0.0
 
 ticker = bot.exchange.get_tickers(symbol)[symbol]
 
@@ -387,6 +403,9 @@ while True:
             report_close_scalp(bot, scalp)
             total_result += scalp.result_fact_diff
 
+            total_cur1_diff += scalp.cur1_diff
+            total_cur2_diff += scalp.cur2_diff
+
             scalps.remove_scalp(scalp.id)
             bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
 
@@ -400,6 +419,10 @@ bot.log(bot.LOG_INFO, "")
 bot.log(bot.LOG_INFO, "Total scalps added with order 1 complete {}".format(scalps_added))
 bot.log(bot.LOG_INFO, "No more active scalps")
 bot.log(bot.LOG_INFO, "Total result from {}".format(total_result))
+
+bot.log(bot.LOG_INFO, "Total cur1 diff {}".format(total_cur1_diff))
+bot.log(bot.LOG_INFO, "Total cur2 diff {}".format(total_cur2_diff))
+
 bot.log(bot.LOG_INFO, "Exiting...")
 
 sys.exit(0)

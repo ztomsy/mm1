@@ -41,9 +41,12 @@ class SingleScalp(object):
         self.cancel_threshold = cancel_threshold
 
         self.order1 = None  # type: FokOrder
-        self.order2 = None  # type: RecoveryOrder
+        self.order2 = None  # type: FokOrder
 
         self.result_fact_diff = 0.0
+
+        self.cur1_diff = 0.0
+        self.cur2_diff = 0.0
 
         self.id = str(uuid.uuid4())
         self.state = "new"  # "order1","order1_complete", "order1_not_filled",  "order2", "closed"
@@ -95,6 +98,8 @@ class SingleScalp(object):
 
         if self.state == "order1" and order1_status == "closed" and self.order1.filled > 0:
             self.state = "order1_complete"
+            self.cur1_diff = -self.order1.filled_start_amount
+            self.cur2_diff = self.order1.filled_dest_amount
             return self.state
 
         if self.state == "order1" and order1_status == "closed" and self.order1.filled <= 0:
@@ -104,11 +109,16 @@ class SingleScalp(object):
 
         if self.state == "order1_complete" and order2_status == "open":
             self.state = "order2"
+
             return self.state
 
         if self.state == "order2" and order2_status == "closed":
             self.state = "closed"
             self.result_fact_diff = self.order2.filled_dest_amount - self.order1.filled_start_amount
+
+            self.cur1_diff += self.order2.filled_dest_amount
+            self.cur2_diff -= self.order2.filled_start_amount
+
             return self.state
 
 
@@ -177,7 +187,7 @@ class ScalpBot(tkgcore.Bot):
                                    "time_created_utc",
                                    "leg1-order-state", "leg1-order-status", "leg1-order-updates", "leg1-filled",
                                    "leg2-order-state", "leg2-order-status","leg2-filled",
-                                   "leg2-order1-updates"])
+                                   "leg2-order1-updates", "cur1-diff", "cur2-diff"])
 
         self.om_proceed_sleep = 0.0
         self.symbol = ""
