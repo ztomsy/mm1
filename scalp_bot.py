@@ -62,10 +62,25 @@ class SingleScalp(object):
     def create_order2(self):
         order2_target_amount = self.order1.filled_start_amount * (1 + self.profit)
 
-        order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
-                               order2_target_amount, self.commission, self.cancel_threshold,
-                               self.order2_max_updates_for_profit,
-                               self.order2_max_updates_market)
+        order2_side = tkgcore.core.get_trade_direction_to_currency(self.symbol, self.start_currency)
+
+        order2_price = 0.0
+
+        if order2_side == "buy":
+            order2_price = self.order1.filled_dest_amount / order2_target_amount
+
+        elif order2_side == "sell":
+            order2_price = order2_target_amount / self.order1.filled_dest_amount
+
+
+        # order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
+        #                        order2_target_amount, self.commission, self.cancel_threshold,
+        #                        self.order2_max_updates_for_profit,
+        #                        self.order2_max_updates_market)
+
+        order2 = FokOrder.create_from_start_amount(self.symbol, self.dest_currency, self.order1.filled_dest_amount,
+                                                   self.start_currency, order2_price, self.cancel_threshold,
+                                                   self.order2_max_updates_for_profit)
 
         self.state = "order2"
 

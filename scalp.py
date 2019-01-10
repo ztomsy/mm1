@@ -89,7 +89,7 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     if _scalp.order2 is not None :
         report["leg2-order-state"] = _scalp.order2.state
         report["leg2-order-status"] = _scalp.order2.status
-        report["leg2-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.best_dest_amount
+        report["leg2-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.amount_dest
 
         report["leg2-order1-updates"] = int(_scalp.order2.orders_history[0].update_requests_count) if \
             len(_scalp.order2.orders_history) > 0 else None
