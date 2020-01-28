@@ -1,7 +1,7 @@
-import tkgcore
-from tkgcore import TradeOrder
-from tkgcore import OrderWithAim
-from tkgcore import RecoveryOrder, FokOrder
+import ztom
+from ztom import TradeOrder
+from ztom import OrderWithAim
+from ztom import RecoveryOrder, FokOrder
 import uuid
 import sys
 import csv
@@ -41,9 +41,12 @@ class SingleScalp(object):
         self.cancel_threshold = cancel_threshold
 
         self.order1 = None  # type: FokOrder
-        self.order2 = None  # type: RecoveryOrder
+        self.order2 = None  # type: FokOrder
 
         self.result_fact_diff = 0.0
+
+        self.cur1_diff = 0.0
+        self.cur2_diff = 0.0
 
         self.id = str(uuid.uuid4())
         self.state = "new"  # "order1","order1_complete", "order1_not_filled",  "order2", "closed"
@@ -62,10 +65,25 @@ class SingleScalp(object):
     def create_order2(self):
         order2_target_amount = self.order1.filled_start_amount * (1 + self.profit)
 
-        order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
-                               order2_target_amount, self.commission, self.cancel_threshold,
-                               self.order2_max_updates_for_profit,
-                               self.order2_max_updates_market)
+        order2_side = ztom.core.get_trade_direction_to_currency(self.symbol, self.start_currency)
+
+        order2_price = 0.0
+
+        if order2_side == "buy":
+            order2_price = self.order1.filled_dest_amount / order2_target_amount
+
+        elif order2_side == "sell":
+            order2_price = order2_target_amount / self.order1.filled_dest_amount
+
+
+        # order2 = RecoveryOrder(self.symbol, self.dest_currency, self.order1.filled_dest_amount, self.start_currency,
+        #                        order2_target_amount, self.commission, self.cancel_threshold,
+        #                        self.order2_max_updates_for_profit,
+        #                        self.order2_max_updates_market)
+
+        order2 = FokOrder.create_from_start_amount(self.symbol, self.dest_currency, self.order1.filled_dest_amount,
+                                                   self.start_currency, order2_price, self.cancel_threshold,
+                                                   self.order2_max_updates_for_profit)
 
         self.state = "order2"
 
@@ -80,6 +98,8 @@ class SingleScalp(object):
 
         if self.state == "order1" and order1_status == "closed" and self.order1.filled > 0:
             self.state = "order1_complete"
+            self.cur1_diff = -self.order1.filled_start_amount
+            self.cur2_diff = self.order1.filled_dest_amount
             return self.state
 
         if self.state == "order1" and order1_status == "closed" and self.order1.filled <= 0:
@@ -89,11 +109,16 @@ class SingleScalp(object):
 
         if self.state == "order1_complete" and order2_status == "open":
             self.state = "order2"
+
             return self.state
 
         if self.state == "order2" and order2_status == "closed":
             self.state = "closed"
             self.result_fact_diff = self.order2.filled_dest_amount - self.order1.filled_start_amount
+
+            self.cur1_diff += self.order2.filled_dest_amount
+            self.cur2_diff -= self.order2.filled_start_amount
+
             return self.state
 
 
@@ -150,7 +175,7 @@ class ScalpsCollection(object):
         return missed_scalps
 
 
-class ScalpBot(tkgcore.Bot):
+class ScalpBot(ztom.Bot):
 
     def __init__(self, default_config: str, log_filename=None):
         super(ScalpBot, self).__init__(default_config, log_filename)
@@ -162,7 +187,7 @@ class ScalpBot(tkgcore.Bot):
                                    "time_created_utc",
                                    "leg1-order-state", "leg1-order-status", "leg1-order-updates", "leg1-filled",
                                    "leg2-order-state", "leg2-order-status","leg2-filled",
-                                   "leg2-order1-updates"])
+                                   "leg2-order1-updates", "cur1-diff", "cur2-diff"])
 
         self.om_proceed_sleep = 0.0
         self.symbol = ""
