@@ -1,7 +1,7 @@
-import tkgcore
-from tkgcore import TradeOrder
-from tkgcore import OrderWithAim
-from tkgcore import RecoveryOrder, FokOrder
+import ztom
+from ztom import TradeOrder
+from ztom import OrderWithAim
+from ztom import RecoveryOrder, FokOrder
 import uuid
 import sys
 import csv
@@ -65,7 +65,7 @@ class SingleScalp(object):
     def create_order2(self):
         order2_target_amount = self.order1.filled_start_amount * (1 + self.profit)
 
-        order2_side = tkgcore.core.get_trade_direction_to_currency(self.symbol, self.start_currency)
+        order2_side = ztom.core.get_trade_direction_to_currency(self.symbol, self.start_currency)
 
         order2_price = 0.0
 
@@ -175,7 +175,7 @@ class ScalpsCollection(object):
         return missed_scalps
 
 
-class ScalpBot(tkgcore.Bot):
+class ScalpBot(ztom.Bot):
 
     def __init__(self, default_config: str, log_filename=None):
         super(ScalpBot, self).__init__(default_config, log_filename)

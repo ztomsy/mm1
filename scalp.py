@@ -1,5 +1,5 @@
-import tkgcore
-from tkgcore import OrderWithAim
+import ztom
+from ztom import ActionOrder
 from scalp_bot import ScalpBot, ScalpsCollection, SingleScalp
 import sys
 import csv
@@ -39,7 +39,7 @@ def log_scalp_status(_bot, _scalp):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
 
 
-def log_scalp_order(_bot, _scalp, _scalp_order: OrderWithAim):
+def log_scalp_order(_bot, _scalp, _scalp_order: ActionOrder):
     _bot.log(_bot.LOG_INFO, "######################################################################################")
     _bot.log(_bot.LOG_INFO, "Scalp ID: {}".format(_scalp.id))
     _bot.log(_bot.LOG_INFO,
@@ -111,7 +111,7 @@ def report_close_scalp(_bot: ScalpBot, _scalp: SingleScalp):
     if _scalp.order2 is not None :
         report["leg2-order-state"] = _scalp.order2.state
         report["leg2-order-status"] = _scalp.order2.status
-        report["leg2-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.amount_dest
+        report["leg2-filled"] = _scalp.order2.filled_dest_amount / _scalp.order2.dest_amount
 
         report["leg2-order1-updates"] = int(_scalp.order2.orders_history[0].update_requests_count) if \
             len(_scalp.order2.orders_history) > 0 else None
@@ -142,7 +142,7 @@ def report_order2_closed(_bot, _scalp):
                  "Scalp ID: {}. Closed after Order 1.".format(_scalp.id))
 
 
-bot = ScalpBot("", "scalp.log")
+bot = ScalpBot("_config_default.json", "scalp.log")
 
 bot.set_from_cli(sys.argv[1:])  # cli parameters  override config
 bot.load_config_from_file(bot.config_filename)  # config taken from cli or default
@@ -150,6 +150,8 @@ bot.load_config_from_file(bot.config_filename)  # config taken from cli or defau
 bot.init_exchange()
 
 if bot.offline:
+    bot.offline_tickers_file = "test_data/tickers_many.csv"
+    bot.offline_markets_file = "test_data/markets_binance.json"
     bot.init_offline_mode()
 
 bot.init_remote_reports()
@@ -174,11 +176,11 @@ total_result = 0.0
 total_cur1_diff = 0.0
 total_cur2_diff = 0.0
 
-ticker = bot.exchange.get_tickers(symbol)[symbol]
+ticker = bot.exchange.fetch_tickers(symbol)[symbol]
 
 depth = 1
 
-om = tkgcore.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
+om = ztom.OwaManager(bot.exchange, bot.max_order_update_attempts, bot.max_order_update_attempts, bot.request_sleep)
 # om.log = lambda x, y: x
 om.log = bot.log  # override order manager logger to the bot logger
 om.LOG_INFO = bot.LOG_INFO
@@ -186,7 +188,7 @@ om.LOG_ERROR = bot.LOG_ERROR
 om.LOG_DEBUG = bot.LOG_DEBUG
 om.LOG_CRITICAL = bot.LOG_CRITICAL
 
-order1_side = tkgcore.core.get_order_type(start_currency, dest_currency, symbol)
+order1_side = ztom.core.get_order_type(start_currency, dest_currency, symbol)
 
 if order1_side == "buy":
     start_price = ticker["bid"]*(1 - profit_with_fee*bot.first_order_price_margin_in_profits_with_fees
@@ -255,7 +257,7 @@ while True:
         bot.log(bot.LOG_INFO, "Getting ticker. Tickers collected {}/{}".format(len(tickers_hist["ask"]), bot.ma_long_window) )
         new_buy_order_price = None
 
-        ticker = bot.exchange.get_tickers(symbol)[symbol]
+        ticker = bot.exchange.fetch_tickers(symbol)[symbol]
 
     except Exception as e:
         bot.log(bot.LOG_ERROR, "Error while fetching tickers exchange_id:{} session_uuid:{}".
@@ -285,12 +287,12 @@ while True:
 
         if order1_side == "buy":
             bot.log(bot.LOG_INFO, "Use ASK for MAs")
-            ma_long = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_long_window)
-            ma_short = tkgcore.indicators.computeMA(tickers_hist["ask"], bot.ma_short_window)
+            ma_long = ztom.indicators.computeMA(tickers_hist["ask"], bot.ma_long_window)
+            ma_short = ztom.indicators.computeMA(tickers_hist["ask"], bot.ma_short_window)
         else:
             bot.log(bot.LOG_INFO, "Use BID for MAs")
-            ma_long = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_long_window)
-            ma_short = tkgcore.indicators.computeMA(tickers_hist["bid"], bot.ma_short_window)
+            ma_long = ztom.indicators.computeMA(tickers_hist["bid"], bot.ma_long_window)
+            ma_short = ztom.indicators.computeMA(tickers_hist["bid"], bot.ma_short_window)
 
     ok_to_add_scapls = False
 
